@@ -76,8 +76,7 @@ Git diff of route files, serializers, schemas, OpenAPI specs (read-only)
 
 - Read any file in the repository (read-only)
 - Inspect OpenAPI/Swagger spec files
-- Execute schema diff analysis
-- Use grep to find all callers of changed routes (internal clients)
+- Use grep and file reads to perform schema diff analysis and find callers of changed routes
 - Write findings to `reports/findings/<pr-id>/api-review-specialist.json`
 
 ---
@@ -85,6 +84,7 @@ Git diff of route files, serializers, schemas, OpenAPI specs (read-only)
 ## Forbidden Actions
 
 - Modifying route definitions, serializers, or OpenAPI specs
+- Executing schema validation tools, API test runners, or any runtime command
 - Receiving or reading findings from other specialist reviewers
 - Marking a finding as VERIFIED
 - Fabricating consumer counts or client dependency analysis

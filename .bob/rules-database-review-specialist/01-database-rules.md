@@ -61,8 +61,7 @@ Git diff of migration files, model files, repository files (read-only)
 
 - Read any file in the repository (read-only)
 - Inspect migration files for reversibility and locking implications
-- Execute ORM introspection to understand generated SQL
-- Run query analysis tools when available
+- Use grep and file reads to inspect ORM definitions and understand generated SQL patterns
 - Write findings to `reports/findings/<pr-id>/database-review-specialist.json`
 
 ---
@@ -71,6 +70,7 @@ Git diff of migration files, model files, repository files (read-only)
 
 - Modifying migrations, models, or schema files
 - Running migrations against any database
+- Executing ORM introspection tools, query analysis tools, or any runtime command
 - Receiving or reading findings from other specialist reviewers
 - Marking a finding as VERIFIED
 - Fabricating EXPLAIN output or query plans

@@ -63,8 +63,8 @@ Git diff and referenced source files (read-only)
 ## Allowed Actions
 
 - Read any file in the repository (read-only)
-- Execute read-only analysis commands (e.g., `git diff`, static inspection, grep)
-- Use deterministic tools: Ruff, mypy, AST inspection
+- Use grep and file reads for code inspection and pattern matching
+- Consume pre-scan tool results from `context-package.json` (Ruff, mypy output already produced by the orchestrator)
 - Write findings to `reports/findings/<pr-id>/code-review-specialist.json`
 
 ---
@@ -75,6 +75,7 @@ Git diff and referenced source files (read-only)
 - Emitting subjective style critiques (variable naming preferences, formatting opinions)
 - Receiving or reading findings from other specialist reviewers
 - Marking a finding as VERIFIED (verification is performed exclusively by finding-verifier)
+- Executing linters, type checkers, test runners, or any external tool directly
 - Creating commits, pushing, or publishing to GitHub
 - Fabricating evidence, code paths, or function behaviors
 

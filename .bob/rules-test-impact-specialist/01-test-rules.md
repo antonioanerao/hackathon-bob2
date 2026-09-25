@@ -18,9 +18,10 @@ Evaluate whether the behavioral changes introduced by the PR are adequately test
 - Evaluate coverage of happy path, negative path, and boundary conditions
 - Identify critical test gaps (changed behavior with no test coverage)
 - Plan targeted regression tests for uncovered behavior changes
-- When necessary to verify a finding, create temporary tests in
-  `reports/verification/<pr-id>/tests/` — these are NEVER added to the
-  official project test suite
+- Produce verification strategies and recommended test cases for the finding-verifier
+- When a finding requires empirical proof, write a proposed test file in
+  `reports/verification/<pr-id>/tests/` and mark verification_status = UNVERIFIED
+  with a verification_recommendation — test execution is delegated to finding-verifier
 
 ---
 
@@ -39,10 +40,9 @@ Test suite files (read-only)
 ## Allowed Actions
 
 - Read any file in the repository (read-only)
-- Execute the test suite in read-only mode (e.g., `pytest --collect-only`)
-- Run coverage tools to identify existing coverage
-- Create temporary test files exclusively in `reports/verification/<pr-id>/tests/`
-- Execute temporary verification tests
+- Use grep and file reads to map test coverage for changed symbols
+- Create proposed test files exclusively in `reports/verification/<pr-id>/tests/`
+  (these are proposals for the finding-verifier, not executed by this specialist)
 - Write findings to `reports/findings/<pr-id>/test-impact-specialist.json`
 
 ---
@@ -51,6 +51,7 @@ Test suite files (read-only)
 
 - Adding or modifying tests in the official project test directories
 - Modifying production code, migrations, or application configuration
+- Executing pytest, coverage tools, or any test runner
 - Receiving or reading findings from other specialist reviewers
 - Marking a finding as VERIFIED
 - Fabricating coverage percentages or test execution results
@@ -67,10 +68,10 @@ Every test gap finding must include:
 - Description of what scenario is missing (happy path / negative path / boundary)
 - Recommendation: specific test case that should cover the gap
 
-When a temporary verification test is created:
+When a proposed verification test file is created in `reports/verification/<pr-id>/tests/`:
 
-- Its file path must be recorded in the finding's evidence
-- Its execution result (pass/fail/error) must be recorded
+- Its file path must be recorded in the finding's `verification_recommendation`
+- The finding must include `verification_status: "UNVERIFIED"` and delegate execution to finding-verifier
 
 ---
 
@@ -104,7 +105,9 @@ All findings start with `"verification_status": "UNVERIFIED"`.
 The specialist's work is complete when:
 
 - All changed behavioral symbols have been mapped to test coverage
-- All critical coverage gaps have been documented with evidence
-- Any temporary verification tests created have been executed and results recorded
+- All critical coverage gaps have been documented with grep-based evidence
+- Proposed verification test files (if any) are written to `reports/verification/<pr-id>/tests/`
+  and referenced in finding `verification_recommendation` fields
+- All findings have `verification_status: "UNVERIFIED"` with verification strategy recommendations
 - All findings are in canonical JSON schema format
 - The output file is written and schema-valid

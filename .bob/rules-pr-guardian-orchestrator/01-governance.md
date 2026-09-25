@@ -126,13 +126,16 @@ In fast path, synthesis is always performed by the orchestrator via `review-synt
 Before spawning any specialist, run deterministic tools appropriate to the change.
 Execute each tool **at most once per run**. Results go into `context-package.json`.
 
-| Condition                          | Tool                |
-|------------------------------------|---------------------|
-| Python files changed               | `ruff check`        |
-| Security-sensitive Python changed  | `bandit`            |
-| Testable logic changed             | targeted `pytest`   |
-| Dependency manifest changed        | `pip-audit`         |
-| Semgrep rules available            | targeted `semgrep`  |
+| Condition                          | Tool                            |
+|------------------------------------|---------------------------------|
+| Python files changed               | `ruff check`                    |
+| Security-sensitive Python changed  | `bandit`                        |
+| Dependency manifest changed        | `pip-audit`                     |
+| Semgrep rules available            | targeted `semgrep`              |
+
+> **Note:** `pytest` is NOT run by the orchestrator by default.
+> Full test suite execution is forbidden. Targeted tests are executed only by the
+> `finding-verifier` when verifying a specific CRITICAL or HIGH finding.
 
 Specialists consume pre-scan results from `context-package.json`.
 No specialist should re-run a tool that the orchestrator already executed.

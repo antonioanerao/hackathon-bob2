@@ -115,9 +115,12 @@ Select tools based on what changed:
 |------------------------------------|-------------------|-------------------------------------------|
 | Python files changed               | `ruff check`      | `ruff check <changed_file> --output-format=json` |
 | Security-sensitive Python changed  | `bandit`          | `bandit -r <changed_file> -f json`        |
-| Testable logic changed             | targeted `pytest` | `pytest tests/test_<module>.py -v --tb=short` |
 | Dependency manifest changed        | `pip-audit`       | `pip-audit --format json`                 |
 | Semgrep rules present              | `semgrep`         | `semgrep --config=auto <changed_file> --json` |
+
+> **Note:** `pytest` is NOT run during the orchestrator pre-scan.
+> Full test suite execution is forbidden. Targeted test execution is performed
+> exclusively by the `finding-verifier` when verifying specific CRITICAL/HIGH findings.
 
 Run each applicable tool **at most once**. Do not run tools that are not applicable.
 Record results (pass/fail + summary) in `context-package.json`.

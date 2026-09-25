@@ -93,23 +93,23 @@ Using the impact map:
 3. Identify callers that may be passing values that the old code handled
    but the new code does not
 
-### Phase 5: Deterministic Tool Execution
+### Phase 5: Pre-scan Results Consumption
 
-Run when available:
-```bash
-ruff check <changed_files>
-mypy <changed_files>
-python -m py_compile <changed_files>
-```
+If the orchestrator produced deterministic tool results (Ruff, mypy), they are
+available in `context-package.json`. Consume those results as evidence.
 
-Record tool output as evidence.
+Do NOT re-run Ruff, mypy, or any linter/compiler directly.
+If no pre-scan result exists for a tool you would need, add a `verification_recommendation`
+pointing to the finding-verifier for that specific check.
 
 ## Deterministic Tools & Evidence
 
 ```bash
-ruff check app/changed_file.py
-mypy app/changed_file.py --strict
+# Read-only investigation — no execution:
 grep -n "TODO\|FIXME\|HACK\|XXX" app/changed_file.py
+grep -n "<pattern>" app/changed_file.py
+
+# Pre-scan results available in context-package.json (produced by orchestrator)
 ```
 
 ## Canonical Output

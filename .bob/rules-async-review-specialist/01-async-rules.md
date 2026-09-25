@@ -75,7 +75,7 @@ Git diff of task files, worker files, queue config (read-only)
 
 - Read any file in the repository (read-only)
 - Inspect task definitions, worker configurations, queue settings
-- Execute grep for retry/idempotency patterns
+- Use grep and file reads to identify retry, idempotency, and acknowledgment patterns
 - Write findings to `reports/findings/<pr-id>/async-review-specialist.json`
 
 ---
@@ -83,6 +83,7 @@ Git diff of task files, worker files, queue config (read-only)
 ## Forbidden Actions
 
 - Modifying task definitions, worker files, or queue configuration
+- Executing task runners, workers, or any runtime command
 - Receiving or reading findings from other specialist reviewers
 - Marking a finding as VERIFIED
 - Fabricating execution traces or queue behavior

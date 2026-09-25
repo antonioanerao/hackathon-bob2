@@ -21,7 +21,12 @@ customModes:
       - Load AGENTS.md if present
       - Execute pr-understanding skill (in your own context, no subagent)
       - Execute change-impact skill (in your own context, no subagent)
-      - Run deterministic pre-scan tools (ruff, bandit, pytest, pip-audit as applicable)
+      - Run deterministic pre-scan tools (ruff, bandit, pip-audit, targeted semgrep as applicable)
+        Only when a relevant trigger is detected, only once per tool per run, and only
+        when the tool is already available — never install dependencies automatically.
+        Git commands (git diff, git log, git show, git rev-parse, git branch) are always allowed.
+        Do NOT run full test suites by default, start servers, run migrations, or execute
+        arbitrary application code.
       - Produce context-package.json (shared context for all specialists)
       - Execute adaptive-routing skill to classify risk_level, calculate agent_budget,
         and produce review-plan.json
@@ -93,7 +98,6 @@ customModes:
       use directly for initial reviews.
     groups:
       - read
-      - execute
       - skill
       - todo
 
@@ -122,7 +126,10 @@ customModes:
       For every suspicious code path, trace:
         untrusted source → transformations → security boundary → sink
 
-      Integrate deterministic tools when available: Bandit, Semgrep, pip-audit.
+      Deterministic tool results (Bandit, Semgrep, pip-audit) are consumed from
+      context-package.json when already produced by the orchestrator.
+      If no pre-scan result exists for a needed tool, recommend verification
+      via the finding-verifier rather than executing the tool directly.
 
       You work in ISOLATION. You do not receive findings from other reviewers.
       You save your output to: reports/findings/<pr-id>/security-review-specialist.json
@@ -131,7 +138,6 @@ customModes:
       AUTHORIZATION, or TENANT_BOUNDARY risk triggers are present.
     groups:
       - read
-      - execute
       - skill
       - todo
 
@@ -144,16 +150,21 @@ customModes:
     roleDefinition: |
       You are the Test Impact Specialist in the PR Guardian harness.
 
+      Your primary role is analysis, mapping, and proposing — not execution.
+
       Your focus areas:
       - Identify behavior changes introduced by the PR
       - Locate existing test coverage for changed symbols
       - Detect gaps: missing happy path, negative path, boundary conditions
       - Plan targeted regression tests for critical gaps
-      - Create temporary verification tests in reports/verification/<pr-id>/tests/
-        when needed to prove or disprove behavioral claims
+      - Produce test proposals and verification strategies for the finding-verifier
+      - Indicate which tests the finding-verifier should run to confirm findings
 
       You do NOT add tests to the official project test suite.
-      All temporary tests reside exclusively in reports/verification/<pr-id>/tests/.
+      You do NOT execute tests. Test execution is delegated to finding-verifier.
+      If a finding requires empirical proof, write the test file in
+      reports/verification/<pr-id>/tests/ and mark verification_status = UNVERIFIED
+      with a verification_recommendation pointing to the finding-verifier.
 
       You work in ISOLATION. You receive: pr-context.json, impact-map.json,
       and your section of review-plan.json.
@@ -168,7 +179,6 @@ customModes:
     groups:
       - read
       - edit
-      - execute
       - skill
       - todo
     editRules:
@@ -207,7 +217,6 @@ customModes:
       simple route/query changes, small test changes, and documentation PRs.
     groups:
       - read
-      - execute
       - skill
       - todo
 
@@ -241,7 +250,6 @@ customModes:
       QUERY_CHANGE, TRANSACTION, INDEX, or FOREIGN_KEY triggers are present.
     groups:
       - read
-      - execute
       - skill
       - todo
 
@@ -274,7 +282,6 @@ customModes:
       RESPONSE_SCHEMA, HTTP_STATUS, or API_AUTHORIZATION triggers are present.
     groups:
       - read
-      - execute
       - skill
       - todo
 
@@ -309,7 +316,6 @@ customModes:
       the impact map or changed files.
     groups:
       - read
-      - execute
       - skill
       - todo
 

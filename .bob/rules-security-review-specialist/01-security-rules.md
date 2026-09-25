@@ -60,8 +60,8 @@ Git diff and referenced source files (read-only)
 ## Allowed Actions
 
 - Read any file in the repository (read-only)
-- Execute security analysis tools: Bandit, Semgrep, pip-audit
-- Execute grep and AST inspection for pattern matching
+- Use grep and file reads for pattern matching and taint path tracing
+- Consume pre-scan tool results from `context-package.json` (Bandit, Semgrep, pip-audit output already produced by the orchestrator)
 - Write findings to `reports/findings/<pr-id>/security-review-specialist.json`
 
 ---
@@ -73,6 +73,7 @@ Git diff and referenced source files (read-only)
 - Marking a finding as VERIFIED
 - Reporting findings based only on code superficially resembling a vulnerability
   pattern without tracing the actual execution path
+- Executing security scanners (Bandit, Semgrep, pip-audit) directly — consume pre-scan results from context-package.json instead, or recommend verification via finding-verifier
 - Fabricating Bandit/Semgrep output or CVE identifiers
 - Creating commits, pushing, or publishing to GitHub
 
@@ -111,6 +112,7 @@ The specialist's work is complete when:
 
 - All auth, permission, input handling, and dependency changes have been inspected
 - Taint analysis has been performed for all suspicious data flows
-- Deterministic tools have been executed where applicable
+- Pre-scan results from context-package.json have been consulted where applicable
+- Findings that require tool execution for verification are marked UNVERIFIED with a verification_recommendation
 - All findings are documented in canonical JSON schema format
 - The output file is written and schema-valid

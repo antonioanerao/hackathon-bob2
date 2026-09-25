@@ -50,7 +50,7 @@ For each changed symbol, find existing tests:
 ```bash
 grep -rn "<symbol_name>" tests/ --include="*.py"
 grep -rn "<symbol_name>" test/ --include="*.py"
-pytest --collect-only -q 2>/dev/null | grep "<module_name>"
+grep -rn "class.*Test\|def test_" tests/ --include="*.py" | grep "<module_name>"
 ```
 
 For each test found, assess what scenario it covers:
@@ -88,17 +88,18 @@ For each caller identified in the impact map:
 If no existing test would catch a regression in a HIGH or CRITICAL caller,
 record a test gap finding.
 
-### Phase 5: Verification Test Creation (When Required)
+### Phase 5: Verification Test Proposal (When Required)
 
 When a finding requires empirical proof that coverage is absent or that behavior
-is untested, create a minimal targeted test:
+is untested, write a proposed minimal test file and delegate execution to the finding-verifier:
 
 ```python
 # reports/verification/<pr-id>/tests/test_<finding_id>.py
 """
-Verification test for TEST-NNN: <finding title>
+Verification test proposal for TEST-NNN: <finding title>
 This file is a temporary verification artifact.
 DO NOT commit to the project test suite.
+Execution is delegated to the finding-verifier.
 """
 import pytest
 from app.module import changed_function
@@ -108,17 +109,19 @@ def test_gap_scenario():
     ...
 ```
 
-Execute and record result:
-```bash
-pytest reports/verification/<pr-id>/tests/test_<finding_id>.py -v
-```
+Do NOT execute this test. Record its path in `verification_recommendation` and set
+`verification_status = "UNVERIFIED"`. The finding-verifier will execute it.
 
 ## Deterministic Tools & Evidence
 
 ```bash
-pytest --collect-only -q
+# Read-only investigation — no execution:
 grep -rn "<symbol>" tests/ --include="*.py"
-coverage run -m pytest tests/ && coverage report --include="<changed_file>"
+grep -rn "<symbol>" test/ --include="*.py"
+
+# pytest --collect-only is NOT run by this specialist
+# coverage tools are NOT run by this specialist
+# Execution is delegated to the finding-verifier
 ```
 
 ## Canonical Output
@@ -140,10 +143,16 @@ Finding IDs: `TEST-001`, `TEST-002`, ...
       "description": "<which behavior is changed and why it is untested>",
       "file": "<path to changed file>",
       "line": "<integer>",
-      "evidence": ["<grep result showing no test for symbol>", "<coverage output if available>"],
+      "evidence": ["<grep result showing no test for symbol>"],
       "impact": "<what regression would go undetected>",
       "recommendation": "<specific test scenario that should be written>",
       "verification_status": "UNVERIFIED",
+      "verification_recommendation": {
+        "required": true,
+        "strategy": "TARGETED_TEST",
+        "reason": "Test coverage gap cannot be confirmed without executing a targeted test.",
+        "proposed_test_file": "reports/verification/<pr-id>/tests/test_TEST-001.py"
+      },
       "origin": "INTRODUCED_BY_PR | EXPOSED_BY_PR | PRE_EXISTING | UNKNOWN",
       "reviewer": "test-impact-specialist",
       "metadata": {
@@ -175,7 +184,8 @@ Finding IDs: `TEST-001`, `TEST-002`, ...
 ## Completion Criteria
 
 - All changed behavioral symbols have been mapped to existing test coverage
-- Critical coverage gaps have been documented with grep/coverage evidence
-- Verification tests have been created and executed when required
-- Test results are recorded in the evidence fields
+- Critical coverage gaps have been documented with grep-based evidence
+- Proposed verification test files (if any) are written to `reports/verification/<pr-id>/tests/`
+  and referenced in finding `verification_recommendation` fields
+- All findings have `verification_status: "UNVERIFIED"` with verification strategy recommendations
 - Output file is written and schema-valid

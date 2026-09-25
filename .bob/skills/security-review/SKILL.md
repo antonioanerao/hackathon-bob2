@@ -94,25 +94,26 @@ When multi-tenant context is present:
 
 ### Phase 6: Injection Analysis
 
-For each database interaction:
-```bash
-bandit -t B608 app/changed_file.py   # SQL injection
-bandit -t B602,B603 app/changed_file.py  # command injection
-semgrep --config=p/owasp-top-ten .
-```
+For each database interaction, trace the code path statically:
+- Is user input passed directly to a raw SQL query string?
+- Is parameterized query syntax used correctly?
+- Is an OS command constructed from user-controlled input?
+
+If the orchestrator pre-scan results (Bandit, Semgrep) are available in `context-package.json`,
+consume those results. Do NOT re-run Bandit or Semgrep directly.
+If no pre-scan result exists, include a `verification_recommendation` for the finding-verifier.
 
 For each template rendering:
 - Is user input escaped before insertion?
 
 ### Phase 7: Dependency Vulnerability Scan
 
-When dependency files changed:
-```bash
-pip-audit
-safety check
-```
+When dependency files changed, check `context-package.json` for pip-audit results
+already produced by the orchestrator.
+Do NOT re-run pip-audit or safety directly.
+If no pre-scan result exists, include a `verification_recommendation` for the finding-verifier.
 
-Record any CVEs introduced by new or updated packages.
+Record any CVEs found in pre-scan results.
 
 ### Phase 8: Secrets and Cryptography
 
@@ -124,11 +125,12 @@ Record any CVEs introduced by new or updated packages.
 ## Deterministic Tools & Evidence
 
 ```bash
-bandit -r app/ -f json
-semgrep --config=p/owasp-top-ten --json .
-pip-audit --format json
+# Read-only investigation — no execution:
 grep -rn "password\|secret\|token\|api_key" --include="*.py" . | grep -v "test"
 grep -rn "MD5\|SHA1\|DES\b" --include="*.py" .
+
+# Pre-scan results available in context-package.json (produced by orchestrator):
+# bandit, semgrep, pip-audit — consume, do not re-run
 ```
 
 ## Canonical Output
@@ -186,6 +188,7 @@ Finding IDs: `SEC-001`, `SEC-002`, ...
 
 - All changed auth, authorization, input, and dependency code has been analyzed
 - Taint paths have been traced for all suspicious flows
-- Deterministic tools have been executed where available and output recorded
+- Pre-scan results from `context-package.json` have been consumed where applicable
+- Findings requiring tool execution are marked UNVERIFIED with verification_recommendation
 - All findings have file + line + evidence + attack path
 - Output file is written and schema-valid

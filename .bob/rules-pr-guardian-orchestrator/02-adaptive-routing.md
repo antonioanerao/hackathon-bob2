@@ -22,7 +22,9 @@ Before generating `review-plan.json`, the orchestrator must have:
 - `pr-context.json` (changed files, components, technologies)
 - `impact-map.json` (indirect dependencies, callers, consumers)
 - Repository discovery results (language, framework, ORM, queue, etc.)
-- Deterministic pre-scan results (ruff, bandit, pytest, pip-audit as applicable)
+- Deterministic pre-scan results (ruff, bandit, pip-audit, semgrep as applicable)
+  Note: pytest is NOT included in the orchestrator pre-scan. Targeted test execution
+  is reserved exclusively for the finding-verifier.
 
 ---
 

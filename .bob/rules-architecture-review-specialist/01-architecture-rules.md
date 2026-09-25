@@ -56,9 +56,7 @@ Git diff and referenced source files (read-only)
 ## Allowed Actions
 
 - Read any file in the repository (read-only)
-- Execute import graph analysis tools
-- Execute grep for cross-module import patterns
-- Execute AST analysis to detect dependency violations
+- Use grep and file reads to analyze import graphs and cross-module patterns
 - Write findings to `reports/findings/<pr-id>/architecture-review-specialist.json`
 
 ---
@@ -71,6 +69,7 @@ Git diff and referenced source files (read-only)
 - Emitting findings based on personal architectural preferences without demonstrating
   concrete impact
 - Recommending complete rewrites based on PR-scoped changes
+- Executing runtime import tests or AST tools directly — findings must be supported by static code inspection
 - Fabricating import graphs or dependency trees
 - Creating commits, pushing, or publishing to GitHub
 

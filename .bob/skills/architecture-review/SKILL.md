@@ -78,11 +78,14 @@ A cohesion violation is when:
 
 ### Phase 5: Circular Dependency Detection
 
-Check for circular imports:
+Check for circular imports using static inspection:
 ```bash
-python -c "import app.changed_module"  # will fail with ImportError on cycles
-grep -rn "from app.module_a import" app/module_b/ && grep -rn "from app.module_b import" app/module_a/
+grep -rn "from app.module_a import" app/module_b/ --include="*.py"
+grep -rn "from app.module_b import" app/module_a/ --include="*.py"
 ```
+
+Do NOT run `python -c "import ..."` or any runtime import test.
+Circular dependency detection must be performed via static grep of import statements.
 
 Any import cycle introduced by the PR is a concrete defect (it may cause
 `ImportError` at runtime or make startup order-dependent).
@@ -98,10 +101,11 @@ When a high-level module imports a low-level module directly:
 ## Deterministic Tools & Evidence
 
 ```bash
+# Read-only investigation — no execution:
 grep -rn "^from\|^import" <changed_file>
-python -c "import <changed_module>"  # circular import test
 grep -rn "from app.routes" app/services/ --include="*.py"  # layer violation search
 grep -rn "from app.services" app/routes/ --include="*.py"
+grep -rn "from app.module_a import" app/module_b/ --include="*.py"  # circular import check
 ```
 
 ## Canonical Output
@@ -156,8 +160,8 @@ Finding IDs: `ARCH-001`, `ARCH-002`, ...
 
 ## Completion Criteria
 
-- Import graph for changed modules has been built
+- Import graph for changed modules has been built via static grep analysis
 - All cross-layer imports have been evaluated for concrete impact
-- Circular dependencies have been checked
+- Circular dependencies have been checked via static import inspection
 - Every finding has a concrete impact statement, not just a preference statement
 - Output file is written and schema-valid
