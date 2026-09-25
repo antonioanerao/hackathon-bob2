@@ -1,170 +1,80 @@
 ---
 name: code-review
 description: >
-  Evaluates logic correctness, error handling, state coherence, edge cases,
-  nullability, resource lifecycle, concurrency, and behavioral regressions
-  in the PR's changed code. Used by the code-review-specialist.
+  Reviews changed logic for concrete correctness and regression defects.
 ---
 
 # Code Review
 
-## Purpose
+## Use When
 
-Identify concrete correctness and safety defects in the logic changes
-introduced by the PR. Not style opinions — defects with evidence.
+Activate for behavioral changes such as:
 
-## Core Principle
+- application logic
+- concurrency
+- error handling
+- state changes
 
-> Don't just comment. Prove it.
+## Check
 
-## When to Use
+Review changed functions in context for:
 
-Activated by the orchestrator when APPLICATION_LOGIC, CONCURRENCY, or any
-behavioral change domain is detected.
+- logic errors
+- missing/error paths
+- null/None handling
+- inconsistent state
+- resource leaks
+- race conditions
+- async/await mistakes
+- edge cases
+- regressions affecting callers
 
-## Inputs
+Use the impact map and existing pre-scan results when available.
 
-- `reports/context/<pr-id>/pr-context.json`
-- `reports/context/<pr-id>/impact-map.json`
-- `reports/plans/<pr-id>/review-plan.json` (code-review section)
-- Git diff of changed files
-- Source files referenced by the diff (read-only)
+Do not re-run linters or tests.
 
-## Phases
+## Evidence
 
-### Phase 1: Context Loading
+Each finding must include:
 
-Before reading the diff:
-1. Read the PR intent from `pr-context.json`
-2. Read the impact map to understand indirect effects
-3. Identify the changed symbols and their callers
+- changed file/line
+- concrete code evidence
+- practical impact
+- actionable recommendation
 
-### Phase 2: Diff Analysis
+If runtime proof is needed, add a verification recommendation for `finding-verifier`.
 
-For each changed function or method:
-1. Read the full function body (not just the changed lines)
-2. Understand the before-and-after behavior change
-3. Identify all code paths: normal, error, edge cases
+## Output
 
-### Phase 3: Correctness Check
+Write:
 
-For each changed code path, verify:
+`reports/findings/<pr-id>/code-review-specialist.json`
 
-**Logic correctness:**
-- Does the new logic implement the intended behavior?
-- Are there off-by-one errors, incorrect comparisons, inverted conditions?
-- Are all return paths handled?
+Finding IDs:
 
-**Error handling:**
-- Are exceptions caught at the right level?
-- Are exceptions swallowed silently?
-- Does error recovery leave the system in a consistent state?
+`CODE-001`, `CODE-002`, ...
 
-**State consistency:**
-- Can partial state updates occur if an exception is raised mid-operation?
-- Is shared state mutated in a way that is visible to concurrent callers?
-- Are transactions used where atomicity is required?
+Use the canonical finding schema.
 
-**Nullability:**
-- Are there dereferences of potentially null/None values?
-- Are optional fields accessed without null checks?
+Categories:
 
-**Resource lifecycle:**
-- Are file handles, DB connections, and network sockets properly closed?
-- Are context managers used where applicable?
-- Can a code path exit without releasing a resource?
+`LOGIC_ERROR`, `ERROR_HANDLING`, `NULL_DEREFERENCE`,
+`STATE_CONSISTENCY`, `RESOURCE_LEAK`, `RACE_CONDITION`,
+`EDGE_CASE`, `REGRESSION`.
 
-**Concurrency:**
-- Is shared mutable state accessed without locks?
-- Is there a TOCTOU (time-of-check to time-of-use) race condition?
-- Are async operations awaited correctly?
+Set:
 
-**Edge cases:**
-- Empty collections
-- Zero values
-- Maximum/minimum values
-- Concurrent execution of the same code path
+`verification_status: UNVERIFIED`
 
-### Phase 4: Regression Analysis
+## Must Not
 
-Using the impact map:
-1. For each changed symbol, find its callers
-2. Verify that the new behavior is compatible with caller expectations
-3. Identify callers that may be passing values that the old code handled
-   but the new code does not
+- execute tests or tools
+- report style issues
+- scan unrelated code
+- report pre-existing issues as introduced
+- invent evidence
+- analyze only diff lines when full function context is needed
 
-### Phase 5: Pre-scan Results Consumption
+## Done When
 
-If the orchestrator produced deterministic tool results (Ruff, mypy), they are
-available in `context-package.json`. Consume those results as evidence.
-
-Do NOT re-run Ruff, mypy, or any linter/compiler directly.
-If no pre-scan result exists for a tool you would need, add a `verification_recommendation`
-pointing to the finding-verifier for that specific check.
-
-## Deterministic Tools & Evidence
-
-```bash
-# Read-only investigation — no execution:
-grep -n "TODO\|FIXME\|HACK\|XXX" app/changed_file.py
-grep -n "<pattern>" app/changed_file.py
-
-# Pre-scan results available in context-package.json (produced by orchestrator)
-```
-
-## Canonical Output
-
-File: `reports/findings/<pr-id>/code-review-specialist.json`
-
-Finding IDs: `CODE-001`, `CODE-002`, ...
-
-```json
-{
-  "reviewer": "code-review-specialist",
-  "findings": [
-    {
-      "id": "CODE-001",
-      "category": "ERROR_HANDLING | NULL_DEREFERENCE | STATE_CONSISTENCY | RESOURCE_LEAK | RACE_CONDITION | EDGE_CASE | LOGIC_ERROR | REGRESSION",
-      "severity": "CRITICAL | HIGH | MEDIUM | LOW | INFO",
-      "confidence": "CERTAIN | LIKELY | POSSIBLE",
-      "title": "<concise title>",
-      "description": "<technical explanation>",
-      "file": "<path>",
-      "line": "<integer>",
-      "evidence": ["<specific code line or tool output>"],
-      "impact": "<what breaks or degrades>",
-      "recommendation": "<actionable fix>",
-      "verification_status": "UNVERIFIED",
-      "origin": "INTRODUCED_BY_PR | EXPOSED_BY_PR | PRE_EXISTING | UNKNOWN",
-      "reviewer": "code-review-specialist",
-      "metadata": {
-        "root_cause": "",
-        "related_symbols": []
-      }
-    }
-  ]
-}
-```
-
-## Failure Modes
-
-| Failure | Correct Response |
-|---------|-----------------|
-| mypy unavailable | Record `TOOL_UNAVAILABLE`, continue manual analysis |
-| Changed file is auto-generated | Note and skip — do not analyze generated code |
-| Concurrency model unclear | Lower confidence to POSSIBLE, explain ambiguity |
-
-## What This Skill Must Not Do
-
-- Emit style critiques (naming conventions, formatting, line length)
-- Flag issues that exist only in code not touched by the PR
-- Issue findings about patterns the reviewer dislikes without concrete impact
-- Skip reading the full function body and analyzing only the diff lines
-
-## Completion Criteria
-
-- All changed functions and methods have been inspected in full context
-- Impact map has been used to identify regression risks
-- Tool output has been recorded where tools were executed
-- All findings have file + line + evidence
-- Output file is written and schema-valid
+All changed behavioral code in scope was reviewed and evidence-backed findings were written.

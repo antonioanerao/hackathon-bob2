@@ -1,5 +1,7 @@
 # PR Guardian — `.bob/` Harness
 
+> **Load knowledge lazily, not globally.**
+
 > **Don't just comment. Prove it.**
 
 PR Guardian is an evidence-based, multi-agent Pull Request review harness
@@ -19,16 +21,16 @@ findings with measurable noise reduction.
                             ▼
                 PR Guardian Orchestrator
                             │
-             ┌──────────────┼──────────────┐
-             ▼              ▼              ▼
-      PR Understanding  Change Impact  Repository Discovery
-             │              │              │
-             └──────────────┼──────────────┘
+                    [Load pr-triage skill]
+                            │
                             ▼
-                     Adaptive Routing
+                       PR Triage
+            (understanding + impact + routing)
                             │
                             ▼
                     review-plan.json
+                            │
+       [Load only selected specialist skills]
                             │
       ┌──────────┬──────────┼──────────┬───────────┐
       ▼          ▼          ▼          ▼           ▼
@@ -41,6 +43,8 @@ findings with measurable noise reduction.
                         ▼
                  Canonical Findings
                         │
+     [Load finding-verification only if CRITICAL/HIGH exist]
+                        │
                         ▼
                   Finding Verifier
                         │
@@ -48,6 +52,7 @@ findings with measurable noise reduction.
        ▼                ▼                 ▼
    VERIFIED          REFUTED          UNVERIFIED
        │
+      [Load review-synthesis at final stage]
        ▼
                Review Synthesizer
                         │
@@ -58,6 +63,7 @@ findings with measurable noise reduction.
          ┌──────────────┼───────────────┐
          ▼              ▼               ▼
     review.json     review.md     run-manifest.json
+                                  (includes context_efficiency)
 ```
 
 ---
@@ -98,20 +104,21 @@ findings with measurable noise reduction.
 
 ## Skills
 
-| Skill | Purpose |
-|---|---|
-| `pr-understanding` | Collect PR metadata, changed files, technologies |
-| `change-impact` | Map indirect effects: callers, routes, jobs, tests |
-| `adaptive-routing` | Select/skip reviewers; produce review-plan.json |
-| `code-review` | Correctness, error handling, edge cases |
-| `security-review` | Taint analysis, OWASP, CVEs |
-| `test-impact` | Coverage gaps, verification test creation |
-| `architecture-review` | Boundary violations, coupling, circular deps |
-| `database-review` | Migration safety, N+1, locks, referential integrity |
-| `api-review` | Breaking changes, HTTP, OpenAPI alignment |
-| `queue-review` | Idempotency, retries, DLQ, poison messages |
-| `finding-verification` | Prove or refute with deterministic evidence |
-| `review-synthesis` | Merge, deduplicate, classify, report, metrics |
+| Skill | Load Timing | Purpose |
+|---|---|---|
+| `pr-triage` | **Always** (initialization) | PR understanding + impact + risk + routing (single pass) |
+| `code-review` | Lazy — only if selected | Correctness, error handling, edge cases |
+| `security-review` | Lazy — only if selected | Taint analysis, OWASP, CVEs |
+| `test-impact` | Lazy — only if selected | Coverage gaps, verification test creation |
+| `architecture-review` | Lazy — only if selected | Boundary violations, coupling, circular deps |
+| `database-review` | Lazy — only if selected | Migration safety, N+1, locks, referential integrity |
+| `api-review` | Lazy — only if selected | Breaking changes, HTTP, OpenAPI alignment |
+| `queue-review` | Lazy — only if selected | Idempotency, retries, DLQ, poison messages |
+| `finding-verification` | Lazy — only if CRITICAL/HIGH findings exist | Prove or refute with deterministic evidence |
+| `review-synthesis` | Lazy — only at final stage | Merge, deduplicate, classify, report, metrics |
+| `pr-understanding` | Legacy (now part of pr-triage) | Kept for standalone/manual use |
+| `change-impact` | Legacy (now part of pr-triage) | Kept for standalone/manual use |
+| `adaptive-routing` | Legacy (now part of pr-triage) | Kept for standalone/manual use |
 
 ---
 
@@ -200,6 +207,13 @@ traced code path. Opinions without evidence are discarded or downgraded.
 Findings are submitted to a skeptical verifier that either proves or
 refutes them using deterministic tools and targeted tests.
 
+### Lazy Skill Loading
+
+Skills are loaded only when needed. `pr-triage` is the only skill loaded
+during initialization. Specialist skills are loaded lazily after `review-plan.json`
+is produced, and only for selected reviewers. `skill_load_rate` is tracked
+in every run manifest.
+
 ### Adaptive Routing
 
 Irrelevant specialists are not executed. Routing decisions are explicit
@@ -225,6 +239,7 @@ Every run produces:
 | `verified_findings` | Count with status VERIFIED |
 | `refuted_findings` | Count with status REFUTED |
 | `duplicates_removed` | Findings merged into root-cause groups |
+| `skill_load_rate` | `loaded_skills / available_skills` |
 
 ---
 

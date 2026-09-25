@@ -1,205 +1,67 @@
 # Review Synthesizer — Rules
 
-These rules govern the review-synthesizer mode.
-They complement `rules-plan/` and `rules-agent/` and do not replace them.
-
----
-
-## Activation Model
-
-The `review-synthesizer` mode is **not spawned automatically** on every PR run.
-
-By default, the orchestrator executes the `review-synthesis` skill directly in
-its own context without spawning this subagent.
-
-Spawn `review-synthesizer` as a subagent only when:
-- More than 3 specialists contributed findings
-- Total initial findings exceed 15
-- Deduplication complexity is high (many overlapping findings)
-- Orchestrator context capacity is a constraint
-
-This mode remains available for manual invocation and escalation at any time.
-
----
-
 ## Scope
 
-Consolidate all specialist findings and verification results into the final
-review artifacts. Eliminate noise, deduplicate by root cause, and produce
-actionable structured output.
+Consolidate existing findings and verification results into final review artifacts.
 
----
+Do not search for new bugs.
 
-## Responsibilities
+## Activate When
 
-1. Read all specialist findings from `reports/findings/<pr-id>/`
-2. Read `reports/verification/<pr-id>/verification-results.json` (if verification was invoked)
-3. Join verification statuses to their corresponding findings
-4. Remove all findings with `verification_status: REFUTED`
-5. Perform root-cause deduplication
-6. Classify findings as BLOCKING or ADVISORY
-7. Calculate all metrics including agent efficiency
-8. Produce `review.json`
-9. Produce `review.md`
-10. Produce `run-manifest.json`
+Normally synthesis runs inline in the orchestrator.
 
----
+Spawn `review-synthesizer` only when:
 
-## Root-Cause Deduplication
+- >3 specialists produced findings
+- findings volume is high
+- deduplication is complex
+- orchestrator context is constrained
 
-Distinguish between symptoms and root causes.
+## Process
 
-If multiple findings describe different manifestations of the same underlying
-defect, consolidate them into one finding:
-
-- Select the highest-severity finding as the primary representative
-- Merge all evidence from related findings into the primary
-- Record the merged finding IDs in `metadata.related_symbols`
-- Increment `duplicates_removed` count by (N - 1) for each group of N
-
-Example:
-```
-SEC-001: "Missing org check in /api/events"
-CODE-004: "Service passes caller-supplied org_id without validation"
-API-003: "Endpoint allows role bypass through organization parameter"
-→ Root cause: "Missing authorization boundary for organization context"
-→ Primary finding: SEC-001 (highest severity)
-→ Duplicates removed: 2
-```
-
----
-
-## Blocking vs Advisory Classification
-
-```
-BLOCKING:
-  - VERIFIED + CRITICAL
-  - VERIFIED + HIGH
-
-ADVISORY (presented with context and caveats):
-  - VERIFIED + MEDIUM
-  - VERIFIED + LOW
-  - VERIFIED + INFO
-  - UNVERIFIED (any severity) — clearly marked as unverified
-  - NOT_APPLICABLE — included for completeness
-```
-
-REFUTED findings do NOT appear in BLOCKING or ADVISORY sections.
-They are counted in metrics and summarized in the "Refuted Findings" section only.
-
----
+1. Load findings and verification results.
+2. Apply verification status.
+3. Remove `REFUTED` findings from the active set.
+4. Deduplicate findings sharing the same root cause.
+5. Classify:
+   - `BLOCKING` = `VERIFIED` + `CRITICAL|HIGH`
+   - `ADVISORY` = all other active findings
+6. Calculate summary metrics.
+7. Write final artifacts.
 
 ## Inputs
 
-```
-reports/findings/<pr-id>/*.json
-reports/verification/<pr-id>/verification-results.json
-reports/context/<pr-id>/pr-context.json
-reports/plans/<pr-id>/review-plan.json
-```
-
----
-
-## Allowed Actions
-
-- Read any artifact from the current PR run
-- Write `reports/reviews/<pr-id>/review.json`
-- Write `reports/reviews/<pr-id>/review.md`
-- Write `reports/runs/<pr-id>/run-manifest.json`
-
----
-
-## Forbidden Actions
-
-- Creating new findings or searching for new bugs
-- Re-running any specialist reviewer
-- Modifying production code, tests, migrations, or configuration
-- Fabricating metric values
-- Elevating or downgrading verified finding severities
-- Creating commits, pushing, or publishing to GitHub
-
----
-
-## Metric Calculations
-
-```
-routing_discard_rate = skipped_reviewers / 7
-
-noise_reduction_rate = (initial_findings - final_findings) / initial_findings
-  Special case: if initial_findings == 0 → noise_reduction_rate = 0.0
-
-initial_findings = sum of all findings across all specialist output files
-final_findings = findings in review.json after deduplication and REFUTED removal
-duplicates_removed = initial_findings - verified_set - refuted_set - unverified_set - not_applicable_set - verification_failed_set
-
-# Agent efficiency (available_agents = 9: 7 specialists + verifier + synthesizer)
-agent_execution_rate = executed_agents / 9
-agent_avoidance_rate = 1 - agent_execution_rate
-```
-
----
-
-## Review Markdown Structure
-
-The `review.md` file must follow this structure exactly:
-
-```markdown
-# PR Guardian Review
-
-## Executive Summary
-
-## Pull Request Intent
-
-## Impact Analysis
-
-## Review Routing
-
-### Selected Reviewers
-
-### Skipped Reviewers
-
-## Blocking Findings
-
-## Advisory Findings
-
-## Refuted Findings
-
-## Verification Summary
-
-## Noise Reduction
-
-## Review Metrics
-```
-
-Each BLOCKING or ADVISORY finding in the Markdown must include:
-- Finding ID, severity, title
-- Description
-- File and line
-- Evidence (bulleted)
-- Impact
-- Recommendation
-- Verification status and method
-
----
+- `reports/findings/<pr-id>/*.json`
+- `reports/verification/<pr-id>/verification-results.json`, if present
+- `reports/context/<pr-id>/pr-context.json`
+- `reports/plans/<pr-id>/review-plan.json`
 
 ## Outputs
 
-```
-reports/reviews/<pr-id>/review.json
-reports/reviews/<pr-id>/review.md
-reports/runs/<pr-id>/run-manifest.json
-```
+- `reports/reviews/<pr-id>/review.json`
+- `reports/reviews/<pr-id>/review.md`
+- `reports/runs/<pr-id>/run-manifest.json`
 
----
+## Rules
 
-## Completion Criteria
+- Do not create new findings.
+- Do not change finding severity.
+- Do not re-run reviewers or verification.
+- Do not modify production code.
+- Do not fabricate metrics or evidence.
+- Do not include `REFUTED` findings as active.
 
-The synthesizer's work is complete when:
+## Metrics
 
-- All findings have been joined with their verification results
-- REFUTED findings have been removed from the active set
-- Root-cause deduplication has been performed
-- BLOCKING and ADVISORY classification is complete
-- All three output files exist and are schema-valid
-- All metrics are correctly calculated
-- The Markdown report is readable and complete
+At minimum record:
+
+- initial findings
+- final findings
+- refuted findings
+- duplicates removed
+- routing discard rate
+- noise reduction rate
+
+## Done When
+
+Findings are deduplicated, verification statuses applied, classifications complete, and all three final artifacts are written.

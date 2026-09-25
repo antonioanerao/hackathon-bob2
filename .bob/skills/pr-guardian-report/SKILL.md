@@ -1,6 +1,6 @@
 ---
 name: pr-guardian-report
-description: '# /pr-guardian-report'
+description: Regenerates final PR Guardian reports from existing artifacts only.
 metadata:
   user-invocable: true
   disable-model-invocation: true
@@ -8,142 +8,59 @@ metadata:
 
 # /pr-guardian-report
 
-**Mode:** `review-synthesizer`
+## Usage
 
-**Usage:**
-```
-/pr-guardian-report <pr-id>
-/pr-guardian-report 42
-```
-
----
+`/pr-guardian-report <pr-id>`
 
 ## Purpose
 
-Regenerate the final review reports from existing run artifacts without
-re-executing any specialist reviewer or verification step.
+Rebuild final reports without re-running reviewers or verification.
 
-Use this command when:
-- Verification results have been updated since the last synthesis
-- The review format has changed and reports need regeneration
-- The previous synthesis failed and needs to be retried
-- A manual update was made to a finding's metadata
+## Required Inputs
 
-This command reads only from existing artifacts. It does NOT search for
-new bugs, re-run reviewers, or re-run verification.
+Read existing:
 
----
-
-## Pre-Conditions
-
-Before starting, verify all of the following exist:
-
-```
-reports/findings/<pr-id>/                    (at least one findings file)
-reports/context/<pr-id>/pr-context.json
-reports/plans/<pr-id>/review-plan.json
-reports/verification/<pr-id>/verification-results.json
-```
-
-If any required artifact is missing, report the missing file and the
-command that can produce it:
-
-| Missing Artifact | Command to Run First |
-|---|---|
-| No findings files | `/pr-guardian-review <pr-id>` |
-| `pr-context.json` missing | `/pr-guardian-review <pr-id>` |
-| `review-plan.json` missing | `/pr-guardian-review <pr-id>` |
-| `verification-results.json` missing | `/pr-guardian-verify <pr-id>` |
-
----
-
-## Step 1: Input Validation
-
-Parse `<pr-id>` as a positive integer.
-
-If invalid: report accepted format and stop.
-
----
-
-## Step 2: Load All Artifacts
-
-Read:
 - `reports/context/<pr-id>/pr-context.json`
 - `reports/plans/<pr-id>/review-plan.json`
-- All `reports/findings/<pr-id>/*.json`
-- `reports/verification/<pr-id>/verification-results.json`
+- `reports/findings/<pr-id>/*.json`
+- `reports/verification/<pr-id>/verification-results.json`, if available
 
-If `verification-results.json` is missing, proceed with all findings
-marked as UNVERIFIED and note this in the report.
+If required artifacts are missing, report what is missing and stop.
 
----
+## Action
 
-## Step 3: Activate Review Synthesis Skill
+1. Validate `<pr-id>`.
+2. Load existing artifacts.
+3. Run `review-synthesis`.
+4. Generate:
 
-Activate skill: `review-synthesis`
+- `reports/reviews/<pr-id>/review.json`
+- `reports/reviews/<pr-id>/review.md`
+- `reports/runs/<pr-id>/run-manifest.json`
 
-Execute the full synthesis procedure:
-- Verification status enrichment
-- REFUTED finding removal
-- Root-cause deduplication
-- BLOCKING vs ADVISORY classification
-- Metric calculation
-- JSON report generation
-- Markdown report generation
-- Run manifest generation
+If verification results are absent, keep applicable findings as `UNVERIFIED`.
 
----
+## Output
 
-## Step 4: Write Outputs
+Show a short summary with:
 
-Overwrite (or create) the following files:
+- initial findings
+- verified
+- refuted
+- unverified
+- duplicates removed
+- final findings
+- blocking
+- advisory
+- noise reduction rate
 
-```
-reports/reviews/<pr-id>/review.json
-reports/reviews/<pr-id>/review.md
-reports/runs/<pr-id>/run-manifest.json
-```
+Then display `review.md`.
 
----
+## Must Not
 
-## Step 5: Completion Report
-
-Display:
-
-```
-═══════════════════════════════════════════════
- PR Guardian Report Generated
-═══════════════════════════════════════════════
- PR: #<pr-id> — <title>
-
- Findings
-   Initial:             <n>
-   Verified:            <n>
-   Refuted:             <n>
-   Unverified:          <n>
-   Duplicates removed:  <n>
-   Final:               <n>
-
- Blocking:              <n>
- Advisory:              <n>
- Noise reduction rate:  <rate>
-
- Reports:
-   reports/reviews/<pr-id>/review.md     ✓ written
-   reports/reviews/<pr-id>/review.json   ✓ written
-   reports/runs/<pr-id>/run-manifest.json ✓ written
-═══════════════════════════════════════════════
-```
-
-Then display the content of `reports/reviews/<pr-id>/review.md`.
-
----
-
-## Forbidden Actions
-
-- Re-running specialist reviewers
-- Re-running the finding verifier
-- Creating new findings
-- Modifying production code, tests, migrations, or application configuration
-- Committing, pushing, or publishing to GitHub
-- Fabricating findings, evidence, or metrics not present in the input artifacts
+- run specialist reviewers
+- run verification
+- create new findings
+- modify production code/tests/config
+- commit, push, or publish
+- invent findings, evidence, or metrics

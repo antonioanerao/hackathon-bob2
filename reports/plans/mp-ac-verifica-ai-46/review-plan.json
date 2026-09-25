@@ -1,0 +1,25 @@
+{
+  "pr_id": "mp-ac-verifica-ai-46",
+  "risk_level": "LOW",
+  "agent_budget": {
+    "max_reviewers": 1,
+    "max_verifiers": 0
+  },
+  "domains": ["behavioral-logic", "agent-graph"],
+  "risk_triggers": ["BACKGROUND_JOB_CHANGED", "UNTRUSTED_INPUT_CHANGED"],
+  "selected_reviewers": [
+    {
+      "id": "code-review-specialist",
+      "reason": "Behavioral logic change in agent graph nodes: new state field, new formatter, two node functions updated. Logic correctness and edge-case coverage warrant review."
+    }
+  ],
+  "skipped_reviewers": [
+    { "id": "security-review-specialist", "reason": "No auth/tenant/crypto/secret/external-request changes. Content truncation path is not a security boundary." },
+    { "id": "database-review-specialist", "reason": "No database, ORM, migration, or query changes." },
+    { "id": "api-review-specialist", "reason": "No public API, route, schema, or OpenAPI changes." },
+    { "id": "async-review-specialist", "reason": "No queue, worker, or consumer changes." },
+    { "id": "architecture-review-specialist", "reason": "No structural or module-boundary changes." },
+    { "id": "test-impact-specialist", "reason": "Tests added and updated; LOW risk does not warrant separate test-impact review." }
+  ],
+  "routing_discard_rate": 0.86
+}

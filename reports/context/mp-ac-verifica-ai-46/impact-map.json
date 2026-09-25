@@ -1,0 +1,64 @@
+{
+  "pr_id": "mp-ac-verifica-ai-46",
+  "changed_symbols": [
+    {
+      "symbol": "format_research_context",
+      "file": "src/agents/youtube_agent/formatting.py",
+      "type": "new_function",
+      "callers": ["query_youtube in src/agents/youtube_agent/agent.py"]
+    },
+    {
+      "symbol": "_compact_summary",
+      "file": "src/agents/youtube_agent/formatting.py",
+      "type": "new_function",
+      "callers": ["format_research_context"]
+    },
+    {
+      "symbol": "query_youtube",
+      "file": "src/agents/youtube_agent/agent.py",
+      "type": "modified_function",
+      "callers": ["LangGraph graph node execution"],
+      "impact": "Now sets youtube_research_context in returned dict"
+    },
+    {
+      "symbol": "prepare_search_query",
+      "file": "src/graph/nodes.py",
+      "type": "modified_function",
+      "callers": ["LangGraph graph node execution"],
+      "impact": "Reads youtube_research_context instead of scanning media_contexts"
+    },
+    {
+      "symbol": "format_reanalysis_research_query",
+      "file": "src/reanalysis/graph/nodes.py",
+      "type": "modified_function",
+      "callers": ["LangGraph reanalysis graph node execution"],
+      "impact": "Reads youtube_research_context instead of scanning media_contexts"
+    },
+    {
+      "symbol": "format_youtube_research_query",
+      "file": "src/graph/youtube.py",
+      "type": "modified_function",
+      "callers": ["prepare_search_query", "format_reanalysis_research_query"],
+      "impact": "relevant_context now defaults to empty string; context section conditional"
+    },
+    {
+      "symbol": "RouterState",
+      "file": "src/graph/state.py",
+      "type": "modified_typeddict",
+      "impact": "Added youtube_research_context: NotRequired[str]"
+    },
+    {
+      "symbol": "ReanalysisState",
+      "file": "src/reanalysis/graph/state.py",
+      "type": "modified_typeddict",
+      "impact": "Added youtube_research_context: NotRequired[str]"
+    }
+  ],
+  "related_tests": [
+    "tests/test_youtube_agent.py::YouTubeFormattingTest::test_research_context_is_limited_to_three_compact_summaries",
+    "tests/test_youtube_agent.py::YouTubeAgentTest::test_analyzes_public_video_and_prepares_search_context",
+    "tests/test_youtube_agent.py::YouTubeAgentTest::test_prepare_search_uses_only_central_youtube_claim",
+    "tests/test_reanalysis.py::test_reanalysis_uses_only_central_youtube_claim"
+  ],
+  "affected_pipelines": ["youtube → search query", "reanalysis → search query"]
+}

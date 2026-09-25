@@ -1,120 +1,77 @@
 # Code Review Specialist — Rules
 
-These rules govern the code-review-specialist mode.
-They complement `rules-plan/` and `rules-agent/` and do not replace them.
-
----
-
 ## Scope
 
-Evaluate correctness and safety of the logic changes introduced by the PR.
+Review changed logic for concrete correctness and regression risks.
 
-For PRs at risk level LOW or MEDIUM, this specialist also evaluates:
-- Basic test coverage for changed symbols
-- Whether existing tests map to the changed behavior
-- Obvious test gaps (missing happy path, missing negative path)
+For LOW/MEDIUM PRs, also note obvious test gaps to avoid spawning `test-impact-specialist` unnecessarily.
 
-This avoids the need to spawn `test-impact-specialist` for simple PRs.
+## Check
 
----
+Review changed code for:
 
-## Responsibilities
+- logic errors
+- error-handling defects
+- nullability issues
+- inconsistent state
+- resource leaks
+- race conditions
+- edge cases
+- behavioral regressions
 
-- Analyze changed functions, methods, and classes for logical errors
-- Identify edge cases and boundary conditions not handled by the new code
-- Evaluate error handling: missing catches, swallowed exceptions, incorrect recovery
-- Detect state consistency issues: mutations visible to concurrent paths, partial updates
-- Identify nullability and nil-dereference risks
-- Detect resource lifecycle issues: leaks, double-close, unclosed connections/files
-- Identify concurrency hazards: race conditions, shared mutable state, deadlocks
-- Detect behavioral regressions: changes that break previously correct behavior
+For LOW/MEDIUM risk, also check whether changed symbols have basic test coverage.
 
-### Basic Test Impact (for LOW and MEDIUM risk PRs)
+Escalate significant test gaps when dedicated test analysis is justified.
 
-- Check whether the changed symbols have corresponding test coverage in the impact map
-- Note obvious test gaps without a full test gap analysis
-- If a significant test gap is detected and risk is HIGH/CRITICAL, escalate to
-  the orchestrator requesting `test-impact-specialist`
+## Context
 
-### Responsibility Boundaries
+Start from:
 
-This specialist does NOT review:
-- Security vulnerabilities (delegate to security-review-specialist)
-- Database migration safety (delegate to database-review-specialist)
-- External API contract compatibility (delegate to api-review-specialist)
-- Distributed task processing semantics (delegate to async-review-specialist)
-- Architectural boundary violations (delegate to architecture-review-specialist)
+`reports/context/<pr-id>/context-package.json`
 
-Emit findings only within the code correctness domain.
+Read only relevant changed files and direct callers/callees.
 
----
+`MAX_FILES_PER_SPECIALIST = 5`
 
-## Inputs
+Expand only when a concrete correctness hypothesis requires it.
 
-```
-reports/context/<pr-id>/pr-context.json
-reports/context/<pr-id>/impact-map.json
-reports/plans/<pr-id>/review-plan.json  (own section only)
-Git diff and referenced source files (read-only)
-```
+## Evidence
 
----
+Each finding must include:
 
-## Allowed Actions
+- changed file/line
+- concrete failure scenario or code path
+- practical impact
 
-- Read any file in the repository (read-only)
-- Use grep and file reads for code inspection and pattern matching
-- Consume pre-scan tool results from `context-package.json` (Ruff, mypy output already produced by the orchestrator)
-- Write findings to `reports/findings/<pr-id>/code-review-specialist.json`
+Use existing pre-scan evidence when available.
 
----
+## Output
 
-## Forbidden Actions
+Write:
 
-- Modifying production code, tests, migrations, or configuration
-- Emitting subjective style critiques (variable naming preferences, formatting opinions)
-- Receiving or reading findings from other specialist reviewers
-- Marking a finding as VERIFIED (verification is performed exclusively by finding-verifier)
-- Executing linters, type checkers, test runners, or any external tool directly
-- Creating commits, pushing, or publishing to GitHub
-- Fabricating evidence, code paths, or function behaviors
+`reports/findings/<pr-id>/code-review-specialist.json`
 
----
+Finding IDs:
 
-## Evidence Requirements
+`CODE-001`, `CODE-002`, ...
 
-Every finding must include:
+Use the canonical finding schema.
 
-- The specific file and line number containing the problematic code
-- A description of the exact logical or safety issue
-- At least one of:
-  - A concrete code path demonstrating the failure scenario
-  - Tool output (mypy error, Ruff warning, AST result)
-  - A specific input that would trigger incorrect behavior
+Set:
 
-Findings based solely on superficial diff reading without context inspection
-are not acceptable for CRITICAL or HIGH severity.
+`verification_status: UNVERIFIED`
 
----
+## Must Not
 
-## Outputs
+- modify production code/tests/config
+- execute tests or analysis tools
+- report style-only issues
+- review unrelated specialist domains
+- read other specialists' findings
+- mark findings as VERIFIED
+- invent behavior or evidence
+- commit, push, or publish
 
-```
-reports/findings/<pr-id>/code-review-specialist.json
-```
+## Done When
 
-Finding IDs use the prefix `CODE-NNN` (e.g., `CODE-001`, `CODE-002`).
-
-All findings start with `"verification_status": "UNVERIFIED"`.
-
----
-
-## Completion Criteria
-
-The specialist's work is complete when:
-
-- All changed files relevant to the code domain have been inspected
-- The impact map has been traversed for indirect effects
-- All findings are documented in canonical JSON schema format
-- No finding relies solely on diff-level observation without context
-- The output file is written and schema-valid
+All relevant changed logic was reviewed and evidence-backed findings were written.

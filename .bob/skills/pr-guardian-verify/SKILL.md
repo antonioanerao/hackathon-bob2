@@ -1,6 +1,6 @@
 ---
 name: pr-guardian-verify
-description: '# /pr-guardian-verify'
+description: Re-runs verification for existing PR Guardian findings.
 metadata:
   user-invocable: true
   disable-model-invocation: true
@@ -8,151 +8,70 @@ metadata:
 
 # /pr-guardian-verify
 
-**Mode:** `finding-verifier`
+## Usage
 
-**Usage:**
-```
-/pr-guardian-verify <pr-id>
-/pr-guardian-verify 42
-```
+`/pr-guardian-verify <pr-id>`
 
----
+Mode: `finding-verifier`
 
 ## Purpose
 
-Re-run or extend verification for an existing PR Guardian run without
-re-executing the full review pipeline.
+Re-verify existing findings without re-running the full review.
 
-Use this command when:
-- A previous run produced UNVERIFIED or VERIFICATION_FAILED findings
-- New environment access allows previously blocked verifications to proceed
-- The orchestrator requests targeted re-verification of specific findings
+Use for findings currently:
 
-This command DOES NOT re-run specialist reviewers.
-It operates exclusively on findings already produced.
+- `UNVERIFIED`
+- `VERIFICATION_FAILED`
 
----
+Do not re-run specialist reviewers.
 
-## Pre-Conditions
+## Required Inputs
 
-Before starting, verify:
+- `reports/findings/<pr-id>/*.json`
+- `reports/context/<pr-id>/pr-context.json`
+- existing `reports/verification/<pr-id>/verification-results.json`, if present
 
-1. `reports/findings/<pr-id>/` exists and contains at least one findings file
-2. `reports/context/<pr-id>/pr-context.json` exists
+If required artifacts are missing, report and stop.
 
-If pre-conditions are not met, report the missing artifacts and stop.
+## Action
 
----
+1. Validate `<pr-id>`.
+2. Load existing findings and verification results.
+3. Select only eligible unresolved findings.
+4. Load `finding-verification`.
+5. Verify in priority order:
+   - CRITICAL
+   - HIGH
+   - selected MEDIUM
+6. Merge new results with existing results.
+7. Preserve previous `VERIFIED` and `REFUTED` entries unless explicitly targeted.
+8. Write:
 
-## Step 1: Input Validation
+`reports/verification/<pr-id>/verification-results.json`
 
-Parse `<pr-id>` as a positive integer.
+If no eligible findings remain, stop with a short notice.
 
-If invalid: report accepted format and stop.
+## Must Not
 
----
+- create new findings
+- re-run specialist reviewers
+- modify production code/config/migrations
+- overwrite prior verified/refuted results without explicit targeting
+- fabricate evidence or tool output
+- commit, push, or publish
 
-## Step 2: Load Existing Findings
+## Completion
 
-Read all files matching:
-```
-reports/findings/<pr-id>/*.json
-```
+Show a short summary with counts for:
 
-Collect all findings. Build the complete finding list.
+- VERIFIED
+- REFUTED
+- UNVERIFIED
+- NOT_APPLICABLE
+- VERIFICATION_FAILED
 
----
+Then suggest:
 
-## Step 3: Load Existing Verification Results
+`/pr-guardian-report <pr-id>`
 
-Read if it exists:
-```
-reports/verification/<pr-id>/verification-results.json
-```
-
-Identify findings that currently have:
-- `verification_status: "UNVERIFIED"`
-- `verification_status: "VERIFICATION_FAILED"`
-
-These are the candidates for this verification run.
-
-If no UNVERIFIED or VERIFICATION_FAILED findings exist, report:
-```
-No unverified findings found for PR #<id>.
-All findings have been processed in a previous verification run.
-```
-and stop.
-
----
-
-## Step 4: Verification Execution
-
-Activate skill: `finding-verification`
-
-Process candidates by priority:
-1. CRITICAL severity
-2. HIGH severity
-3. MEDIUM severity
-4. LOW severity (when cost is low)
-
-For each candidate finding, execute the verification procedure defined
-in the `finding-verification` skill.
-
----
-
-## Step 5: Update Verification Results
-
-Merge the new verification results with existing results:
-
-- For findings that were previously UNVERIFIED or VERIFICATION_FAILED:
-  update their status with the new result
-- For findings already VERIFIED or REFUTED in a previous run:
-  do NOT overwrite unless explicitly re-verifying by finding ID
-
-Write updated results to:
-```
-reports/verification/<pr-id>/verification-results.json
-```
-
----
-
-## Step 6: Completion Report
-
-Display:
-
-```
-═══════════════════════════════════════════════
- PR Guardian Verification Complete
-═══════════════════════════════════════════════
- PR: #<pr-id>
-
- Findings processed this run:    <n>
-
- Results:
-   VERIFIED:             <n>
-   REFUTED:              <n>
-   UNVERIFIED:           <n>
-   NOT_APPLICABLE:       <n>
-   VERIFICATION_FAILED:  <n>
-
- Updated: reports/verification/<pr-id>/verification-results.json
-═══════════════════════════════════════════════
-```
-
-Note: To regenerate the final review reports incorporating the new
-verification results, run:
-```
-/pr-guardian-report <pr-id>
-```
-
----
-
-## Forbidden Actions
-
-- Re-running specialist reviewers
-- Creating new findings
-- Modifying production code, migrations, or application configuration
-- Committing, pushing, or publishing to GitHub
-- Overwriting VERIFIED or REFUTED findings from a previous run
-  without explicit finding ID targeting
-- Fabricating verification results or tool output
+to regenerate the final report.

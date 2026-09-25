@@ -1,197 +1,175 @@
 ---
 name: api-review
 description: >
-  Evaluates REST and gRPC API contract changes for breaking compatibility,
-  HTTP semantics, OpenAPI alignment, versioning, and API-level authorization.
-  Used by the api-review-specialist.
+  Reviews API changes for contract breakage, HTTP semantics, OpenAPI alignment,
+  input validation, and API-level authorization.
 ---
 
 # API Review
 
 ## Purpose
 
-Identify API contract changes that would break existing clients, introduce
-security gaps at the API boundary, or violate documented specifications.
+Detect API changes that may break consumers, weaken authorization, or diverge from documented contracts.
 
-## Core Question
+Core question:
 
-> Does this change break the API contract for existing consumers?
+> Does this PR introduce a breaking or unsafe API contract change?
 
 ## When to Use
 
-Activated when API, REST, GRPC, ROUTE, OPENAPI, REQUEST_SCHEMA,
-RESPONSE_SCHEMA, HTTP_STATUS, or API_AUTHORIZATION triggers are present.
+Activate only when one or more apply:
+
+- `API`
+- `REST`
+- `GRPC`
+- `ROUTE`
+- `OPENAPI`
+- `REQUEST_SCHEMA`
+- `RESPONSE_SCHEMA`
+- `HTTP_STATUS`
+- `API_AUTHORIZATION`
+- `PUBLIC_API_CHANGED`
 
 ## Inputs
 
-- `reports/context/<pr-id>/pr-context.json`
-- `reports/context/<pr-id>/impact-map.json`
-- `reports/plans/<pr-id>/review-plan.json` (api section)
-- Route/controller/handler files (read-only)
-- Serializer/schema files (read-only)
-- OpenAPI/Swagger spec files (read-only)
+- PR context
+- impact map, if available
+- review plan
+- changed route/controller/handler files
+- changed request/response schema files
+- OpenAPI/Swagger files, if relevant
 
-## Phases
+Read only the minimum files required.
 
-### Phase 1: Route Change Inventory
+Do not execute tests or scanners.
 
-For each changed route file:
-- List all added, removed, and modified routes
-- For each route: HTTP method, path, authentication required, authorization required
+## Analysis
 
-```bash
-grep -n "@app.route\|@router\.\|@bp.route\|path(" app/routes/*.py
-git diff <base_sha>..<head_sha> -- app/routes/
-```
+### 1. Contract Changes
 
-### Phase 2: Breaking Change Detection
+Inspect changed routes and schemas for:
 
-Evaluate every route and schema change against the breaking change matrix:
+- endpoint removed or renamed
+- HTTP method changed
+- required request field added
+- optional field made required
+- response field removed or renamed
+- field type changed
+- query/path parameter semantics changed
+- authentication requirement changed
+- response status/schema changed
 
-**Breaking (requires version bump or migration strategy):**
-- Removed endpoint
-- Changed HTTP method (GET → POST)
-- Added required request field
-- Removed response field
-- Changed field type (string → integer)
-- Changed field name
-- Changed authentication requirement
-- Changed error response schema (status code or body)
-- Changed query parameter from optional to required
+Treat additive changes as usually non-breaking:
 
-**Non-breaking (additive changes):**
-- Added optional request field with default
-- Added new response field (clients ignore unknown fields)
-- Added new endpoint
-- Added new optional query parameter
+- new endpoint
+- new optional field
+- new optional query parameter
+- new response field
 
-For each breaking change found, classify severity:
-- CRITICAL: auth bypass or security regression
-- HIGH: would cause 4xx/5xx errors for valid current clients
-- MEDIUM: silent behavioral change (different data returned)
-- LOW: deprecated field now absent
+### 2. HTTP Semantics
 
-### Phase 3: HTTP Semantics Validation
+Check whether changed endpoints use appropriate status codes.
 
-Verify correct HTTP status code usage:
+Focus especially on:
 
-```
-200 OK         — successful GET, successful synchronous update with response
-201 Created    — successful POST that creates a resource
-204 No Content — successful DELETE or PUT with no response body
-400 Bad Request — client-side validation error
-401 Unauthorized — authentication required or failed
-403 Forbidden   — authenticated but not authorized
-404 Not Found   — resource does not exist
-409 Conflict    — duplicate create or state conflict
-422 Unprocessable Entity — valid JSON but failed business validation
-500 Internal Server Error — unexpected server error
-```
+- creation
+- validation errors
+- authentication failures
+- authorization failures
+- missing resources
+- conflicts
+- unexpected server errors
 
-Flag cases where:
-- 200 is used for a creation operation (should be 201)
-- 500 is returned for client input errors (should be 4xx)
-- 200 is returned for empty results instead of 404
-- Authentication errors return 200 with an error message body
+Do not report stylistic HTTP preferences unless behavior or compatibility is affected.
 
-### Phase 4: OpenAPI Spec Alignment
+### 3. OpenAPI Alignment
 
-If an OpenAPI/Swagger file exists:
-```bash
-cat openapi.yaml
-cat swagger.json
-find . -name "*.yaml" -path "*/api*" -o -name "openapi*.json"
-```
+If an OpenAPI/Swagger definition exists, verify changed endpoints against it:
 
-Compare:
-- Are all changed routes documented in the spec?
-- Do documented request/response schemas match the implementation?
-- Are all documented status codes used correctly?
-- Are new routes added to the spec?
+- route documented
+- request schema aligned
+- response schema aligned
+- status codes aligned
 
-### Phase 5: API Authorization Review
+If no specification exists, review implementation only.
 
-For each route, verify:
-- Is the route protected by authentication middleware?
-- Is the route protected by authorization (role/permission) check?
-- Is the authorization check performed before data access?
-- Are internal/admin routes protected?
+### 4. Authorization
 
-```bash
-grep -n "login_required\|require_permission\|@auth\|@permission\|@requires_role" app/routes/*.py
-```
+For affected endpoints, verify statically:
 
-### Phase 6: Input Validation
+- authentication exists where required
+- authorization is enforced where required
+- permission checks occur before sensitive access
+- admin/internal endpoints remain protected
 
-At the API boundary:
-- Are all required fields validated?
-- Are field types enforced?
-- Are field lengths and value ranges validated?
-- Is user input sanitized before downstream processing?
+Do not duplicate deep security analysis already assigned to `security-review-specialist`.
 
-## Deterministic Tools & Evidence
+### 5. Input Validation
 
-```bash
-git diff <base_sha>..<head_sha> -- app/routes/ app/schemas/ openapi.yaml
-grep -n "status_code\|return.*200\|return.*201\|abort(" app/routes/*.py
-grep -n "required=True\|validators\|Validator" app/schemas/*.py
-```
+Check affected API inputs for:
 
-## Canonical Output
+- required fields
+- type validation
+- constraints/ranges
+- trust-boundary validation
 
-File: `reports/findings/<pr-id>/api-review-specialist.json`
+Only report issues introduced or exposed by the PR.
 
-Finding IDs: `API-001`, `API-002`, ...
+## Severity Guidance
 
-```json
-{
-  "reviewer": "api-review-specialist",
-  "findings": [
-    {
-      "id": "API-001",
-      "category": "BREAKING_CHANGE | HTTP_SEMANTICS | OPENAPI_MISMATCH | MISSING_AUTHORIZATION | MISSING_VALIDATION | VERSIONING | BACKWARD_INCOMPATIBLE",
-      "severity": "CRITICAL | HIGH | MEDIUM | LOW | INFO",
-      "confidence": "CERTAIN | LIKELY | POSSIBLE",
-      "title": "<concise title>",
-      "description": "<what changed and why it breaks or risks consumers>",
-      "file": "<route or schema path>",
-      "line": "<integer>",
-      "evidence": ["<diff showing before/after>", "<spec vs implementation diff>"],
-      "impact": "<client breakage, security bypass, incorrect behavior>",
-      "recommendation": "<version bump, migration strategy, add validation, etc.>",
-      "verification_status": "UNVERIFIED",
-      "origin": "INTRODUCED_BY_PR | EXPOSED_BY_PR | PRE_EXISTING | UNKNOWN",
-      "reviewer": "api-review-specialist",
-      "metadata": {
-        "root_cause": "",
-        "related_symbols": [],
-        "affected_route": "<METHOD /path>",
-        "breaking_change_type": "<field_removed | type_changed | route_removed | etc.>"
-      }
-    }
-  ]
-}
-```
+- `CRITICAL`: auth bypass or major security exposure
+- `HIGH`: breaks valid existing clients or critical contract
+- `MEDIUM`: behavioral incompatibility with limited scope
+- `LOW`: minor concrete compatibility issue
+- `INFO`: objective non-blocking observation
 
-## Failure Modes
+## Output
 
-| Failure | Correct Response |
-|---------|-----------------|
-| No OpenAPI spec found | Note absence; evaluate implementation directly |
-| Cannot determine consumer count | Flag breaking change regardless; impact is unknown |
-| Internal-only API | Still evaluate; internal callers break too |
+Write:
 
-## What This Skill Must Not Do
+`reports/findings/<pr-id>/api-review-specialist.json`
 
-- Modify route definitions, serializers, or OpenAPI specs
-- Report a breaking change without verifying the before/after diff
-- Fabricate consumer counts or client dependency information
+Finding IDs:
+
+`API-001`, `API-002`, ...
+
+Use the project canonical finding schema.
+
+Recommended categories:
+
+- `BREAKING_CHANGE`
+- `HTTP_SEMANTICS`
+- `OPENAPI_MISMATCH`
+- `MISSING_AUTHORIZATION`
+- `MISSING_VALIDATION`
+- `VERSIONING`
+- `BACKWARD_INCOMPATIBLE`
+
+Each finding must include:
+
+- concrete changed file/line
+- before/after evidence when applicable
+- affected route
+- impact
+- actionable recommendation
+- `verification_status: UNVERIFIED`
+
+## Must Not
+
+- modify source or API specifications
+- execute tests or tools
+- scan unrelated API code
+- fabricate client/consumer impact
+- report breaking changes without concrete before/after evidence
+- duplicate findings already covered by another specialist unless the API-specific impact is distinct
 
 ## Completion Criteria
 
-- All changed routes have been inventoried
-- Breaking change analysis is complete for all modified schemas
-- HTTP status codes have been verified
-- OpenAPI alignment has been checked where a spec file exists
-- API-level authorization has been evaluated
-- Output file is written and schema-valid
+Complete when:
+
+- all changed API contracts in scope were reviewed
+- breaking changes were identified
+- HTTP semantics were checked
+- OpenAPI alignment was checked when applicable
+- API authorization and validation were evaluated
+- findings were written using the canonical schema

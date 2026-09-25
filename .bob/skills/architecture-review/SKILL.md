@@ -1,167 +1,75 @@
 ---
 name: architecture-review
 description: >
-  Evaluates structural changes for coupling, cohesion, circular dependencies,
-  boundary violations, and dependency inversion. All findings require concrete
-  impact evidence. Used by the architecture-review-specialist.
+  Reviews structural changes for concrete architectural regressions.
 ---
 
 # Architecture Review
 
-## Purpose
+## Use When
 
-Identify structural changes that increase fragility, reduce testability,
-or violate established architectural boundaries. Every finding must describe
-a concrete, demonstrable consequence — not a pattern preference.
+Activate only for:
 
-## Core Principle
+- module/layer boundary changes
+- new cross-module dependencies
+- circular dependency risk
+- responsibility movement
+- dependency direction changes
 
-> Architectural opinions without impact evidence are not findings.
+## Check
 
-## When to Use
+Review changed code for:
 
-Activated when ARCHITECTURE domain is detected or when the impact map
-reveals cross-module imports or layer violations.
+- excessive coupling
+- low cohesion
+- circular dependencies
+- boundary violations
+- high-level code depending directly on low-level implementation
 
-## Inputs
+Only report issues with concrete impact, such as:
 
-- `reports/context/<pr-id>/pr-context.json`
-- `reports/context/<pr-id>/impact-map.json`
-- `reports/plans/<pr-id>/review-plan.json` (architecture section)
-- Git diff (read-only)
-- Source files (read-only)
+- harder testing
+- import/startup failure risk
+- unnecessary deployment coupling
+- unrelated modules changing together
+- broken architectural boundary
 
-## Phases
+## Evidence
 
-### Phase 1: Layer Model Identification
+Each finding must include:
 
-Before analysis, identify the repository's architectural layers:
-- What are the main layers? (e.g., routes/controllers → services → repositories → models)
-- What are the inter-layer dependency rules?
-- Where are the module boundaries?
+- changed file/line
+- concrete import/dependency evidence
+- practical impact
 
-Use file structure and import patterns to infer the intended architecture
-when not documented.
+Do not report theoretical pattern/SOLID preferences.
 
-### Phase 2: Import Graph Analysis
+## Output
 
-For each changed file with cross-module imports:
+Write:
 
-```bash
-grep -n "^from\|^import" app/changed_file.py
-grep -rn "from app.routes import\|from app.presentation" --include="*.py" app/services/
-```
+`reports/findings/<pr-id>/architecture-review-specialist.json`
 
-Build a directed dependency graph for the changed modules.
+Finding IDs:
 
-Identify:
-- New imports that cross architectural layer boundaries
-- New circular imports
-- Imports of infrastructure concerns into domain/business layers
+`ARCH-001`, `ARCH-002`, ...
 
-### Phase 3: Coupling Analysis
+Use the canonical finding schema.
 
-A coupling increase is when module A gains a new dependency on module B
-such that:
-- A change to B now requires a change to A
-- A cannot be tested without instantiating or mocking B
-- Deploying A now requires deploying B
+Categories:
 
-Evaluate each new cross-module import for these properties.
+`COUPLING`, `COHESION`, `CIRCULAR_DEPENDENCY`,
+`BOUNDARY_VIOLATION`, `DEPENDENCY_INVERSION`,
+`RESPONSIBILITY_MISALIGNMENT`.
 
-### Phase 4: Cohesion Analysis
+## Must Not
 
-A cohesion violation is when:
-- A function or method now contains logic that belongs to a different module
-- A class takes on a second, unrelated responsibility
-- Related logic is split across modules with no clear ownership
+- execute code/tests
+- scan unrelated files
+- invent architecture or dependency cycles
+- report pre-existing issues as introduced
+- recommend broad rewrites
 
-### Phase 5: Circular Dependency Detection
+## Done When
 
-Check for circular imports using static inspection:
-```bash
-grep -rn "from app.module_a import" app/module_b/ --include="*.py"
-grep -rn "from app.module_b import" app/module_a/ --include="*.py"
-```
-
-Do NOT run `python -c "import ..."` or any runtime import test.
-Circular dependency detection must be performed via static grep of import statements.
-
-Any import cycle introduced by the PR is a concrete defect (it may cause
-`ImportError` at runtime or make startup order-dependent).
-
-### Phase 6: Dependency Inversion Evaluation
-
-When a high-level module imports a low-level module directly:
-1. What is the high-level module? (e.g., service layer)
-2. What is the low-level module? (e.g., specific DB driver, external HTTP client)
-3. Does an abstraction (interface/protocol) exist that should be used instead?
-4. What is the concrete impact? (cannot swap implementation without modifying the high-level module)
-
-## Deterministic Tools & Evidence
-
-```bash
-# Read-only investigation — no execution:
-grep -rn "^from\|^import" <changed_file>
-grep -rn "from app.routes" app/services/ --include="*.py"  # layer violation search
-grep -rn "from app.services" app/routes/ --include="*.py"
-grep -rn "from app.module_a import" app/module_b/ --include="*.py"  # circular import check
-```
-
-## Canonical Output
-
-File: `reports/findings/<pr-id>/architecture-review-specialist.json`
-
-Finding IDs: `ARCH-001`, `ARCH-002`, ...
-
-```json
-{
-  "reviewer": "architecture-review-specialist",
-  "findings": [
-    {
-      "id": "ARCH-001",
-      "category": "COUPLING | COHESION | CIRCULAR_DEPENDENCY | BOUNDARY_VIOLATION | DEPENDENCY_INVERSION | RESPONSIBILITY_MISALIGNMENT",
-      "severity": "CRITICAL | HIGH | MEDIUM | LOW | INFO",
-      "confidence": "CERTAIN | LIKELY | POSSIBLE",
-      "title": "<concise title>",
-      "description": "<structural issue and concrete impact>",
-      "file": "<path>",
-      "line": "<integer>",
-      "evidence": ["<import statement>", "<grep result showing violation>"],
-      "impact": "<concrete consequence: untestable, deploy coupling, ImportError, etc.>",
-      "recommendation": "<actionable structural change>",
-      "verification_status": "UNVERIFIED",
-      "origin": "INTRODUCED_BY_PR | EXPOSED_BY_PR | PRE_EXISTING | UNKNOWN",
-      "reviewer": "architecture-review-specialist",
-      "metadata": {
-        "root_cause": "",
-        "related_symbols": [],
-        "violated_boundary": "<layer_from> → <layer_to>"
-      }
-    }
-  ]
-}
-```
-
-## Failure Modes
-
-| Failure | Correct Response |
-|---------|-----------------|
-| Architecture is undocumented | Infer from file structure; state inference explicitly |
-| No clear layering exists | Note the absence; do not impose a layer model |
-| Circular import is pre-existing | Classify as `"origin": "PRE_EXISTING"` — non-blocking |
-
-## What This Skill Must Not Do
-
-- Report findings based on pattern preference without concrete impact
-- Recommend a complete rewrite of modules not changed by the PR
-- Report pre-existing issues as if they were introduced by the PR
-- Fabricate import cycles or dependency graphs
-
-## Completion Criteria
-
-- Import graph for changed modules has been built via static grep analysis
-- All cross-layer imports have been evaluated for concrete impact
-- Circular dependencies have been checked via static import inspection
-- Every finding has a concrete impact statement, not just a preference statement
-- Output file is written and schema-valid
+All structural changes in scope were reviewed and evidence-backed findings were written.

@@ -1,238 +1,88 @@
 ---
 name: finding-verification
 description: >
-  Independently verifies or refutes findings produced by specialist reviewers
-  using deterministic tools, targeted tests, code-path analysis, and
-  config inspection. Used by the finding-verifier. Invoked at most once per
-  run with a batched list of CRITICAL/HIGH (and select MEDIUM) findings.
-  Not invoked for LOW/TRIVIAL risk PRs or when no qualifying findings exist.
+  Verifies or refutes existing findings using targeted, reproducible evidence.
 ---
 
 # Finding Verification
 
-## Purpose
+## Use When
 
-Act as a skeptical, independent engineer who either proves or disproves
-a finding hypothesis. The verifier never searches for new bugs.
-It only evaluates claims already made.
+Run only for eligible findings, preferably in one batch:
 
-## Core Principles
+- CRITICAL
+- HIGH
+- selected MEDIUM when evidence is weak
 
-> A finding unverified is a hypothesis. Verify it or state why you cannot.
+Do not run for LOW/INFO by default.
 
-> Reuse deterministic proof already produced. Do not re-run what was already run.
+## Rules
 
-## Activation Model
+- Verify only findings already reported.
+- Do not search for new bugs.
+- Reuse existing deterministic evidence.
+- Do not re-run tools unless necessary.
+- Use the minimum files and commands required.
 
-Activated by the orchestrator **only when the verification budget justifies it**:
-- Risk level is MEDIUM, HIGH, or CRITICAL
-- At least one CRITICAL or HIGH finding exists
+## Verification
 
-The orchestrator invokes this skill **at most once per run** with a finding batch.
-It is NOT invoked for:
-- TRIVIAL or LOW risk PRs
-- PRs with only MEDIUM/LOW/INFO findings and CERTAIN confidence
+For each finding:
 
-## When to Use
+1. Restate the claim as a testable hypothesis.
+2. Prefer existing evidence first.
+3. If needed, choose one strategy:
 
-Activated by the orchestrator after all specialist reviewers have completed,
-when the verification budget permits. Receives a batched list of findings.
+`STATIC_ANALYSIS`, `TARGETED_TEST`, `INTEGRATION_TEST`,
+`CONFIG_INSPECTION`, `DEPENDENCY_ANALYSIS`,
+`CODE_PATH_PROOF`, `MANUAL_EVIDENCE`.
 
-## Inputs
+4. Classify as:
 
-- `reports/findings/<pr-id>/*.json` (all specialist findings)
-- `reports/context/<pr-id>/pr-context.json`
-- Source files referenced by findings (read-only)
+`VERIFIED`, `REFUTED`, `UNVERIFIED`,
+`NOT_APPLICABLE`, `VERIFICATION_FAILED`.
 
-Per-finding input format:
-```json
-{
-  "finding_id": "<string>",
-  "claim": "<string>",
-  "evidence": ["<string>"],
-  "severity": "<string>",
-  "verification_strategy": ["<strategy>"]
-}
-```
+## Evidence
 
-## Verification Priority Within a Batch
+`VERIFIED` and `REFUTED` require concrete evidence.
 
-Process in this order:
-1. CRITICAL severity
-2. HIGH severity
-3. MEDIUM severity (only when `confidence != CERTAIN` or evidence is thin)
+When execution is required:
 
-LOW and INFO findings are **not included** in the verification batch.
+- prefer targeted tests over full suites
+- record command and exit code
+- create temporary tests only under:
 
-## Deterministic Shortcut
+`reports/verification/<pr-id>/tests/`
 
-Before running any tool, check whether a finding already has proof from
-the orchestrator's deterministic pre-scan (available in `context-package.json`):
+If a tool or environment fails, use `VERIFICATION_FAILED`.
 
-- Bandit match → use as STATIC_ANALYSIS evidence; mark VERIFIED
-- Semgrep match → use as STATIC_ANALYSIS evidence; mark VERIFIED
-- pip-audit CVE → use as DEPENDENCY_ANALYSIS evidence; mark VERIFIED
-- Failing targeted test → use as TARGETED_TEST evidence; mark VERIFIED
-- Direct code-path proof in finding evidence → use as MANUAL_EVIDENCE; mark VERIFIED
+Do not mark REFUTED merely because proof was not found.
 
-Do NOT re-run a tool that already produced a result. Consume the existing output.
+## Output
 
-## Phases
+Write:
 
-### Phase 1: Claim Formulation
+`reports/verification/<pr-id>/verification-results.json`
 
-For each finding, restate the claim in verifiable terms:
+Each result must include:
 
-```
-Finding: "app/repositories.py line 24 returns records for any org_id 
-          passed in the request body without checking authenticated user's org"
+- `finding_id`
+- `status`
+- `method`
+- `command` if executed
+- `exit_code` if applicable
+- `evidence`
+- `notes`
 
-Verifiable claim: "The function get_events() at line 24 uses the org_id 
-                  parameter from the request body directly in the SQL query 
-                  without comparing it to the authenticated user's session org_id"
-```
+## Must Not
 
-### Phase 2: Strategy Selection
+- create new findings
+- change finding severity
+- modify production code/config/migrations
+- add tests to official test directories
+- scan unrelated files
+- repeat existing deterministic checks unnecessarily
+- claim verification without evidence
 
-Choose the most appropriate strategy:
+## Done When
 
-| Strategy | When to Use |
-|---|---|
-| `STATIC_ANALYSIS` | Tool-detectable patterns (injection, CVE, type errors) |
-| `TARGETED_TEST` | Behavioral claims (authorization bypass, wrong return value) |
-| `INTEGRATION_TEST` | End-to-end claims (route returns wrong data) |
-| `CONFIG_INSPECTION` | Configuration-based claims (missing env var, wrong setting) |
-| `DEPENDENCY_ANALYSIS` | CVE claims (specific package vulnerability) |
-| `CODE_PATH_PROOF` | Reachability claims (this code path can be triggered by X) |
-| `MANUAL_EVIDENCE` | Direct code citation (the code literally does X at line Y) |
-
-### Phase 3: Evidence Gathering
-
-Execute the chosen strategy:
-
-**STATIC_ANALYSIS:**
-```bash
-bandit -t <rule_id> <file>
-semgrep --config=<rule> <file>
-ruff check <file> --select <code>
-mypy <file>
-```
-
-**TARGETED_TEST:**
-```python
-# Create: reports/verification/<pr-id>/tests/test_<finding_id>.py
-# Execute: pytest reports/verification/<pr-id>/tests/test_<finding_id>.py -v
-# Record: exit code, stdout, stderr
-```
-
-**DEPENDENCY_ANALYSIS:**
-```bash
-pip-audit --requirement requirements.txt
-pip-audit --format json | grep "<package_name>"
-```
-
-**CODE_PATH_PROOF:**
-- Trace: caller → changed function → vulnerable operation
-- Cite each file and line in the path
-- State whether any guard condition prevents the path from being reached
-
-**CONFIG_INSPECTION:**
-```bash
-cat .env.example config/settings.py
-grep -n "<config_key>" config/*.py
-```
-
-### Phase 4: Result Classification
-
-Based on the evidence gathered:
-
-**VERIFIED:**
-- Test passed demonstrating the vulnerability
-- Tool output explicitly matched the claim
-- Code path is directly traceable with no guards preventing it
-- Configuration confirms the claimed state
-
-**REFUTED:**
-- Test demonstrated correct behavior (vulnerability not reproducible)
-- Tool output explicitly contradicts the claim
-- A guard condition prevents the claimed code path from being reached
-- Configuration contradicts the claim
-
-**UNVERIFIED:**
-- Evidence is inconclusive in either direction
-- The finding is plausible but cannot be confirmed without runtime access
-- Evidence points toward the claim but is not conclusive
-
-**NOT_APPLICABLE:**
-- The finding type cannot be verified empirically
-  (e.g., a design recommendation with no testable predicate)
-
-**VERIFICATION_FAILED:**
-- The required tool is not available (`TOOL_UNAVAILABLE`)
-- The test environment is broken (missing dependencies, import errors)
-- The verification process itself produced an error
-
-### Phase 5: Evidence Documentation
-
-For VERIFIED and REFUTED results, evidence must be non-empty.
-Record the exact command, exit code, and relevant output excerpt.
-
-For UNVERIFIED, explain what would be needed to resolve the uncertainty.
-
-## Deterministic Tools & Evidence
-
-```bash
-bandit -r <file> -f json
-semgrep --config=p/owasp-top-ten --json <file>
-pip-audit --format json
-pytest reports/verification/<pr-id>/tests/ -v --tb=short
-mypy <file> --strict
-```
-
-## Canonical Output
-
-File: `reports/verification/<pr-id>/verification-results.json`
-
-```json
-{
-  "pr_id": "<integer>",
-  "results": [
-    {
-      "finding_id": "<string>",
-      "status": "VERIFIED | UNVERIFIED | NOT_APPLICABLE | VERIFICATION_FAILED | REFUTED",
-      "method": "STATIC_ANALYSIS | TARGETED_TEST | INTEGRATION_TEST | CONFIG_INSPECTION | DEPENDENCY_ANALYSIS | CODE_PATH_PROOF | MANUAL_EVIDENCE",
-      "command": "<command executed or null>",
-      "exit_code": "<integer or null>",
-      "evidence": ["<tool output excerpt>", "<test result>", "<code path citation>"],
-      "notes": "<explanation of result or limitation>"
-    }
-  ]
-}
-```
-
-## Failure Modes
-
-| Failure | Correct Response |
-|---------|-----------------|
-| Tool not installed | Record `TOOL_UNAVAILABLE` in notes; status = `VERIFICATION_FAILED` |
-| Test environment broken | Record error; status = `VERIFICATION_FAILED` |
-| Finding is too vague to test | Record in notes; status = `UNVERIFIED` |
-| Evidence points both ways | Record both; status = `UNVERIFIED` with explanation |
-
-## What This Skill Must Not Do
-
-- Create new findings or report bugs not in the input
-- Elevate the severity of any finding
-- Mark a finding as VERIFIED without reproducible evidence
-- Mark a finding as REFUTED based solely on absence of evidence
-- Add verification tests to the project's official test directories
-- Modify production code, migrations, or application configuration
-
-## Completion Criteria
-
-- Every CRITICAL and HIGH finding has a result entry
-- Every MEDIUM finding has a result entry
-- LOW findings have entries when verification cost was low
-- All VERIFIED results have non-empty evidence arrays
-- All REFUTED results have non-empty evidence arrays
-- `verification-results.json` is written and schema-valid
+Every finding in the verification batch has a justified result and the verification file is written.
