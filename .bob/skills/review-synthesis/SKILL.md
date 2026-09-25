@@ -4,7 +4,9 @@ description: >
   Consolidates all specialist findings and verification results into the final
   review artifacts: review.json, review.md, and run-manifest.json. Removes
   REFUTED findings, groups by root cause, deduplicates, classifies blocking
-  vs advisory, and calculates metrics. Used by the review-synthesizer.
+  vs advisory, and calculates metrics including agent efficiency. Normally
+  executed directly by the orchestrator. The review-synthesizer mode is
+  spawned only for high-volume or complex runs.
 ---
 
 # Review Synthesis
@@ -19,10 +21,22 @@ a clean, deduplicated, actionable review with full metrics and audit trail.
 > The final review must contain only what has been proven or credibly evidenced —
 > stripped of noise, duplicates, and refuted hypotheses.
 
+## Execution Model
+
+By default, the orchestrator executes this skill **directly in its own context**
+without spawning the `review-synthesizer` subagent.
+
+Spawn `review-synthesizer` as a subagent only when:
+- More than 3 specialists contributed findings
+- Total initial findings exceed 15
+- Deduplication complexity is high (many overlapping findings)
+- Orchestrator context capacity is a constraint
+
 ## When to Use
 
-Activated by the orchestrator after `finding-verifier` has completed.
-This is always the final stage of a PR Guardian run.
+Activated by the orchestrator after `finding-verifier` has completed (or after
+the specialist phase, if verification was skipped). This is the final stage of
+every PR Guardian run.
 
 ## Inputs
 
@@ -118,6 +132,11 @@ if initial_findings > 0:
     noise_reduction_rate = (initial_findings - final_findings) / initial_findings
 else:
     noise_reduction_rate = 0.0
+
+# Agent efficiency (available_agents = 9: 7 specialists + verifier + synthesizer)
+executed_agents      = len(selected_reviewers) + (1 if verifier_invoked else 0) + (1 if synthesizer_spawned else 0)
+agent_execution_rate = executed_agents / 9
+agent_avoidance_rate = 1 - agent_execution_rate
 ```
 
 ### Phase 7: JSON Report Generation
@@ -241,6 +260,27 @@ Write `reports/reviews/<pr-id>/review.md` with the following structure:
 Write `reports/runs/<pr-id>/run-manifest.json` with stage statuses and
 all metrics per the schema in `04-artifact-contracts.md`.
 
+Include `agent_efficiency` and `context_reuse` fields:
+```json
+{
+  "agent_efficiency": {
+    "available_agents": 9,
+    "executed_agents": "<integer>",
+    "skipped_agents": "<integer>",
+    "agent_execution_rate": "<float>",
+    "agent_avoidance_rate": "<float>"
+  },
+  "context_reuse": {
+    "context_package_generated": true,
+    "reviewers_using_shared_context": "<integer>",
+    "duplicate_discovery_avoided": true
+  }
+}
+```
+
+Include `verification_invoked` (boolean) and `synthesis_mode`
+(`"ORCHESTRATOR_INLINE"` or `"SYNTHESIZER_SUBAGENT"`).
+
 ## Canonical Output
 
 ```
@@ -256,6 +296,7 @@ reports/runs/<pr-id>/run-manifest.json
 | Specialist findings file missing | Note missing file; count as 0 findings for that reviewer |
 | verification-results.json missing | Mark all findings UNVERIFIED; record in run-manifest |
 | initial_findings == 0 | Set noise_reduction_rate = 0.0; record "No findings produced" |
+| verification skipped | Set verification_invoked=false; all statuses remain UNVERIFIED |
 
 ## What This Skill Must Not Do
 

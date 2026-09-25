@@ -17,53 +17,65 @@ Sharing findings between specialists during the review phase:
 
 ## Input Constraints Per Specialist
 
-Each selected specialist receives exactly:
+Each selected specialist receives **only**:
 
 ```
-pr-context.json                  — PR metadata, changed files, technologies
-impact-map.json                  — indirect change impact
-review-plan.json (own section)   — routing reasons and triggers relevant to this reviewer
+context-package.json             — shared context: PR metadata, technologies, risk level,
+                                   changed files, domains, risk triggers, pre-scan results
+changed files for their domain   — only files relevant to their review scope
+relevant callers/callees         — from impact-map.json, for their changed symbols only
+relevant test files              — tests covering their domain symbols
+specific pre-scan results        — only the deterministic results relevant to their domain
 ```
 
 Specialists do NOT receive:
+- The entire repository as initial context
 - Findings from any other specialist
 - Intermediate outputs from other agents
 - Verification results
 - Synthesis results
+
+Specialists must NOT be instructed to "inspect the entire repository."
+The explicit instruction is:
+> "Inspect only the files and symbols listed in your context package.
+>  Expand scope only when concrete evidence requires it."
 
 ---
 
 ## Information Flow
 
 ```
-pr-context.json ──┐
-impact-map.json ──┼──► code-review-specialist         ──► reports/findings/<pr-id>/code-review-specialist.json
-review-plan.json ─┘
-                  │
-                  ├──► security-review-specialist      ──► reports/findings/<pr-id>/security-review-specialist.json
-                  │
-                  ├──► test-impact-specialist          ──► reports/findings/<pr-id>/test-impact-specialist.json
-                  │
-                  ├──► architecture-review-specialist  ──► reports/findings/<pr-id>/architecture-review-specialist.json
-                  │
-                  ├──► database-review-specialist      ──► reports/findings/<pr-id>/database-review-specialist.json
-                  │
-                  ├──► api-review-specialist           ──► reports/findings/<pr-id>/api-review-specialist.json
-                  │
-                  └──► async-review-specialist         ──► reports/findings/<pr-id>/async-review-specialist.json
+context-package.json ──┐
+domain-specific files ─┼──► [selected specialists only, up to max_reviewers]
+pre-scan results ──────┘
+                       │
+                       ├──► code-review-specialist         ──► reports/findings/<pr-id>/code-review-specialist.json
+                       ├──► security-review-specialist      ──► reports/findings/<pr-id>/security-review-specialist.json
+                       ├──► database-review-specialist      ──► reports/findings/<pr-id>/database-review-specialist.json
+                       ├──► api-review-specialist           ──► reports/findings/<pr-id>/api-review-specialist.json
+                       ├──► async-review-specialist         ──► reports/findings/<pr-id>/async-review-specialist.json
+                       ├──► architecture-review-specialist  ──► reports/findings/<pr-id>/architecture-review-specialist.json
+                       └──► test-impact-specialist          ──► reports/findings/<pr-id>/test-impact-specialist.json
 ```
 
-After ALL specialists complete:
+Note: Only selected specialists run. For TRIVIAL PRs, no specialist runs.
+For LOW PRs, at most one specialist runs.
 
-```
-reports/findings/<pr-id>/*.json ──► finding-verifier ──► verification-results.json
-```
-
-After verification completes:
+If verification budget permits (MEDIUM+ risk, CRITICAL/HIGH findings exist):
 
 ```
 reports/findings/<pr-id>/*.json
-verification-results.json       ──► review-synthesizer ──► review.json, review.md, run-manifest.json
++ verification_batch (CRITICAL/HIGH findings) ──► finding-verifier (once) ──► verification-results.json
+```
+
+After verification (or if skipped), synthesis:
+
+```
+reports/findings/<pr-id>/*.json
+verification-results.json (or absent)
+                       ──► orchestrator (review-synthesis skill, inline)
+                           OR review-synthesizer (subagent, if high volume)
+                       ──► review.json, review.md, run-manifest.json
 ```
 
 ---

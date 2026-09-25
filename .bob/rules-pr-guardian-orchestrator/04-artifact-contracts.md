@@ -7,17 +7,18 @@ artifacts produced during a PR Guardian run.
 
 ## Artifact Registry
 
-| Artifact                                              | Producer                    | Consumer(s)                              |
-|-------------------------------------------------------|-----------------------------|------------------------------------------|
-| `reports/context/<pr-id>/pr-context.json`             | orchestrator                | all specialists, finding-verifier        |
-| `reports/context/<pr-id>/impact-map.json`             | orchestrator                | all specialists, finding-verifier        |
-| `reports/plans/<pr-id>/review-plan.json`              | orchestrator                | all specialists                          |
-| `reports/findings/<pr-id>/<reviewer>.json`            | each specialist             | finding-verifier, review-synthesizer     |
-| `reports/verification/<pr-id>/verification-results.json` | finding-verifier         | review-synthesizer                       |
-| `reports/verification/<pr-id>/tests/*`                | finding-verifier, test-impact | (execution only, never committed)      |
-| `reports/reviews/<pr-id>/review.json`                 | review-synthesizer          | (final output)                           |
-| `reports/reviews/<pr-id>/review.md`                   | review-synthesizer          | (final output, human readable)           |
-| `reports/runs/<pr-id>/run-manifest.json`              | review-synthesizer          | (final output, metrics)                  |
+| Artifact                                                    | Producer                          | Consumer(s)                              |
+|-------------------------------------------------------------|-----------------------------------|------------------------------------------|
+| `reports/context/<pr-id>/pr-context.json`                   | orchestrator                      | all specialists, finding-verifier        |
+| `reports/context/<pr-id>/impact-map.json`                   | orchestrator                      | all specialists, finding-verifier        |
+| `reports/context/<pr-id>/context-package.json`              | orchestrator                      | all specialists (shared context)         |
+| `reports/plans/<pr-id>/review-plan.json`                    | orchestrator                      | all specialists                          |
+| `reports/findings/<pr-id>/<reviewer>.json`                  | each specialist                   | finding-verifier, review-synthesizer     |
+| `reports/verification/<pr-id>/verification-results.json`    | finding-verifier                  | review-synthesizer / orchestrator        |
+| `reports/verification/<pr-id>/tests/*`                      | finding-verifier, test-impact     | (execution only, never committed)        |
+| `reports/reviews/<pr-id>/review.json`                       | orchestrator or review-synthesizer | (final output)                          |
+| `reports/reviews/<pr-id>/review.md`                         | orchestrator or review-synthesizer | (final output, human readable)          |
+| `reports/runs/<pr-id>/run-manifest.json`                    | orchestrator or review-synthesizer | (final output, metrics)                 |
 
 ---
 
@@ -64,11 +65,67 @@ artifacts produced during a PR Guardian run.
 
 ---
 
+## Schema: context-package.json
+
+Produced by the orchestrator before specialist execution.
+Shared with all selected specialists as their primary context input.
+
+```json
+{
+  "pr": {
+    "id": "<integer>",
+    "title": "<string>",
+    "base_sha": "<string>",
+    "head_sha": "<string>"
+  },
+  "repository": {
+    "language": "<string>",
+    "framework": "<string>",
+    "test_framework": "<string>",
+    "database": "<string>",
+    "orm": "<string>",
+    "queue": "<string>"
+  },
+  "risk_level": "TRIVIAL | LOW | MEDIUM | HIGH | CRITICAL",
+  "changed_files": [
+    {
+      "path": "<string>",
+      "change_type": "added | modified | deleted | renamed",
+      "additions": "<integer>",
+      "deletions": "<integer>"
+    }
+  ],
+  "changed_symbols": [
+    {
+      "symbol": "<qualified_name>",
+      "file": "<path>",
+      "change_type": "modified | added | deleted"
+    }
+  ],
+  "relevant_files": ["<path>"],
+  "domains": ["<domain_tag>"],
+  "risk_triggers": ["<trigger_name>"],
+  "deterministic_results": {
+    "lint": "<tool output summary or null>",
+    "security": "<tool output summary or null>",
+    "tests": "<tool output summary or null>",
+    "dependencies": "<tool output summary or null>"
+  }
+}
+```
+
+---
+
 ## Schema: review-plan.json
 
 ```json
 {
   "pr_id": "<integer>",
+  "risk_level": "TRIVIAL | LOW | MEDIUM | HIGH | CRITICAL",
+  "agent_budget": {
+    "max_reviewers": "<integer>",
+    "max_verifiers": "<integer>"
+  },
   "domains": ["<domain_tag>"],
   "risk_triggers": ["<trigger_name>"],
   "selected_reviewers": [
@@ -83,7 +140,8 @@ artifacts produced during a PR Guardian run.
       "reviewer": "<slug>",
       "reason": "<string>"
     }
-  ]
+  ],
+  "routing_discard_rate": "<float>"
 }
 ```
 
@@ -219,14 +277,18 @@ Finding IDs use a reviewer prefix:
   "pr_id": "<integer>",
   "base_sha": "<string>",
   "head_sha": "<string>",
+  "risk_level": "TRIVIAL | LOW | MEDIUM | HIGH | CRITICAL",
   "started_at": "<ISO8601>",
   "completed_at": "<ISO8601>",
   "reviewers_available": 7,
   "reviewers_selected": "<integer>",
   "reviewers_skipped": "<integer>",
+  "synthesis_mode": "ORCHESTRATOR_INLINE | SYNTHESIZER_SUBAGENT",
+  "verification_invoked": "<boolean>",
   "stages": {
     "understanding": "COMPLETED | FAILED | SKIPPED",
     "impact_analysis": "COMPLETED | FAILED | SKIPPED",
+    "deterministic_prescan": "COMPLETED | FAILED | SKIPPED",
     "routing": "COMPLETED | FAILED | SKIPPED",
     "review": "COMPLETED | FAILED | SKIPPED",
     "verification": "COMPLETED | FAILED | SKIPPED",
@@ -245,6 +307,18 @@ Finding IDs use a reviewer prefix:
   "metrics": {
     "routing_discard_rate": "<float>",
     "noise_reduction_rate": "<float>"
+  },
+  "agent_efficiency": {
+    "available_agents": 9,
+    "executed_agents": "<integer>",
+    "skipped_agents": "<integer>",
+    "agent_execution_rate": "<float>",
+    "agent_avoidance_rate": "<float>"
+  },
+  "context_reuse": {
+    "context_package_generated": "<boolean>",
+    "reviewers_using_shared_context": "<integer>",
+    "duplicate_discovery_avoided": "<boolean>"
   }
 }
 ```
@@ -258,23 +332,27 @@ routing_discard_rate = skipped_reviewers / 7
 
 noise_reduction_rate = (initial_findings - final_findings) / initial_findings
   (when initial_findings = 0, noise_reduction_rate = 0.0)
+
+# Agent efficiency (available_agents = 9: 7 specialists + verifier + synthesizer)
+agent_execution_rate = executed_agents / 9
+agent_avoidance_rate = 1 - agent_execution_rate
 ```
 
 ---
 
 ## Write Permission Summary
 
-| Agent                      | May Write To                           |
-|----------------------------|----------------------------------------|
-| orchestrator               | reports/context/**, reports/plans/**, reports/runs/** |
-| code-review-specialist     | reports/findings/**                    |
-| security-review-specialist | reports/findings/**                    |
-| test-impact-specialist     | reports/findings/**, reports/verification/** |
-| architecture-review-specialist | reports/findings/**                |
-| database-review-specialist | reports/findings/**                    |
-| api-review-specialist      | reports/findings/**                    |
-| async-review-specialist    | reports/findings/**                    |
-| finding-verifier           | reports/verification/**                |
-| review-synthesizer         | reports/reviews/**, reports/runs/**    |
+| Agent                          | May Write To                                                       |
+|--------------------------------|--------------------------------------------------------------------|
+| orchestrator                   | reports/context/**, reports/plans/**, reports/runs/**, reports/reviews/** |
+| code-review-specialist         | reports/findings/**                                                |
+| security-review-specialist     | reports/findings/**                                                |
+| test-impact-specialist         | reports/findings/**, reports/verification/**                       |
+| architecture-review-specialist | reports/findings/**                                                |
+| database-review-specialist     | reports/findings/**                                                |
+| api-review-specialist          | reports/findings/**                                                |
+| async-review-specialist        | reports/findings/**                                                |
+| finding-verifier               | reports/verification/**                                            |
+| review-synthesizer             | reports/reviews/**, reports/runs/**                                |
 
 Production code: READ ONLY for all agents.

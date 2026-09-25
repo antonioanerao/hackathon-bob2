@@ -5,6 +5,23 @@ They complement `rules-plan/` and `rules-agent/` and do not replace them.
 
 ---
 
+## Activation Model
+
+The `review-synthesizer` mode is **not spawned automatically** on every PR run.
+
+By default, the orchestrator executes the `review-synthesis` skill directly in
+its own context without spawning this subagent.
+
+Spawn `review-synthesizer` as a subagent only when:
+- More than 3 specialists contributed findings
+- Total initial findings exceed 15
+- Deduplication complexity is high (many overlapping findings)
+- Orchestrator context capacity is a constraint
+
+This mode remains available for manual invocation and escalation at any time.
+
+---
+
 ## Scope
 
 Consolidate all specialist findings and verification results into the final
@@ -16,12 +33,12 @@ actionable structured output.
 ## Responsibilities
 
 1. Read all specialist findings from `reports/findings/<pr-id>/`
-2. Read `reports/verification/<pr-id>/verification-results.json`
+2. Read `reports/verification/<pr-id>/verification-results.json` (if verification was invoked)
 3. Join verification statuses to their corresponding findings
 4. Remove all findings with `verification_status: REFUTED`
 5. Perform root-cause deduplication
 6. Classify findings as BLOCKING or ADVISORY
-7. Calculate all metrics
+7. Calculate all metrics including agent efficiency
 8. Produce `review.json`
 9. Produce `review.md`
 10. Produce `run-manifest.json`
@@ -114,6 +131,10 @@ noise_reduction_rate = (initial_findings - final_findings) / initial_findings
 initial_findings = sum of all findings across all specialist output files
 final_findings = findings in review.json after deduplication and REFUTED removal
 duplicates_removed = initial_findings - verified_set - refuted_set - unverified_set - not_applicable_set - verification_failed_set
+
+# Agent efficiency (available_agents = 9: 7 specialists + verifier + synthesizer)
+agent_execution_rate = executed_agents / 9
+agent_avoidance_rate = 1 - agent_execution_rate
 ```
 
 ---

@@ -9,6 +9,13 @@ They complement `rules-plan/` and `rules-agent/` and do not replace them.
 
 Evaluate correctness and safety of the logic changes introduced by the PR.
 
+For PRs at risk level LOW or MEDIUM, this specialist also evaluates:
+- Basic test coverage for changed symbols
+- Whether existing tests map to the changed behavior
+- Obvious test gaps (missing happy path, missing negative path)
+
+This avoids the need to spawn `test-impact-specialist` for simple PRs.
+
 ---
 
 ## Responsibilities
@@ -21,6 +28,24 @@ Evaluate correctness and safety of the logic changes introduced by the PR.
 - Detect resource lifecycle issues: leaks, double-close, unclosed connections/files
 - Identify concurrency hazards: race conditions, shared mutable state, deadlocks
 - Detect behavioral regressions: changes that break previously correct behavior
+
+### Basic Test Impact (for LOW and MEDIUM risk PRs)
+
+- Check whether the changed symbols have corresponding test coverage in the impact map
+- Note obvious test gaps without a full test gap analysis
+- If a significant test gap is detected and risk is HIGH/CRITICAL, escalate to
+  the orchestrator requesting `test-impact-specialist`
+
+### Responsibility Boundaries
+
+This specialist does NOT review:
+- Security vulnerabilities (delegate to security-review-specialist)
+- Database migration safety (delegate to database-review-specialist)
+- External API contract compatibility (delegate to api-review-specialist)
+- Distributed task processing semantics (delegate to async-review-specialist)
+- Architectural boundary violations (delegate to architecture-review-specialist)
+
+Emit findings only within the code correctness domain.
 
 ---
 

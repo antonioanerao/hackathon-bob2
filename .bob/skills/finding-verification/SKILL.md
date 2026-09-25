@@ -3,7 +3,9 @@ name: finding-verification
 description: >
   Independently verifies or refutes findings produced by specialist reviewers
   using deterministic tools, targeted tests, code-path analysis, and
-  config inspection. Used by the finding-verifier.
+  config inspection. Used by the finding-verifier. Invoked at most once per
+  run with a batched list of CRITICAL/HIGH (and select MEDIUM) findings.
+  Not invoked for LOW/TRIVIAL risk PRs or when no qualifying findings exist.
 ---
 
 # Finding Verification
@@ -14,14 +16,27 @@ Act as a skeptical, independent engineer who either proves or disproves
 a finding hypothesis. The verifier never searches for new bugs.
 It only evaluates claims already made.
 
-## Core Principle
+## Core Principles
 
 > A finding unverified is a hypothesis. Verify it or state why you cannot.
 
+> Reuse deterministic proof already produced. Do not re-run what was already run.
+
+## Activation Model
+
+Activated by the orchestrator **only when the verification budget justifies it**:
+- Risk level is MEDIUM, HIGH, or CRITICAL
+- At least one CRITICAL or HIGH finding exists
+
+The orchestrator invokes this skill **at most once per run** with a finding batch.
+It is NOT invoked for:
+- TRIVIAL or LOW risk PRs
+- PRs with only MEDIUM/LOW/INFO findings and CERTAIN confidence
+
 ## When to Use
 
-Activated by the orchestrator after all specialist reviewers have completed.
-Receives findings from all specialists and processes them by priority.
+Activated by the orchestrator after all specialist reviewers have completed,
+when the verification budget permits. Receives a batched list of findings.
 
 ## Inputs
 
@@ -40,13 +55,27 @@ Per-finding input format:
 }
 ```
 
-## Verification Priority
+## Verification Priority Within a Batch
 
 Process in this order:
 1. CRITICAL severity
 2. HIGH severity
-3. MEDIUM severity
-4. LOW severity (when environment cost is low)
+3. MEDIUM severity (only when `confidence != CERTAIN` or evidence is thin)
+
+LOW and INFO findings are **not included** in the verification batch.
+
+## Deterministic Shortcut
+
+Before running any tool, check whether a finding already has proof from
+the orchestrator's deterministic pre-scan (available in `context-package.json`):
+
+- Bandit match → use as STATIC_ANALYSIS evidence; mark VERIFIED
+- Semgrep match → use as STATIC_ANALYSIS evidence; mark VERIFIED
+- pip-audit CVE → use as DEPENDENCY_ANALYSIS evidence; mark VERIFIED
+- Failing targeted test → use as TARGETED_TEST evidence; mark VERIFIED
+- Direct code-path proof in finding evidence → use as MANUAL_EVIDENCE; mark VERIFIED
+
+Do NOT re-run a tool that already produced a result. Consume the existing output.
 
 ## Phases
 

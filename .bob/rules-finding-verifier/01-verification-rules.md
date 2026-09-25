@@ -12,15 +12,82 @@ This agent does NOT search for new bugs. It only proves or refutes existing clai
 
 ---
 
+## When Verification Is Invoked
+
+The finding-verifier is **not invoked automatically on every PR run**.
+
+The orchestrator invokes it only when the verification budget justifies it:
+
+| Condition | Orchestrator Action |
+|-----------|---------------------|
+| TRIVIAL or LOW risk level | Do not invoke verifier |
+| No CRITICAL or HIGH findings | Do not invoke verifier |
+| CRITICAL or HIGH findings exist | Invoke verifier with a finding batch |
+| MEDIUM findings with CERTAIN confidence | Do not invoke verifier |
+| MEDIUM findings with POSSIBLE confidence | Optionally invoke if cost is low |
+| LOW findings | Do not invoke verifier |
+| INFO findings | Do not invoke verifier |
+
+---
+
+## Batched Invocation
+
+The verifier is invoked **at most once per PR run**.
+
+It receives a batch of findings to process together, not one finding per invocation.
+
+```json
+{
+  "verification_batch": [
+    {
+      "finding_id": "<string>",
+      "claim": "<one-sentence verifiable claim>",
+      "evidence": ["<existing evidence from reviewer>"],
+      "severity": "<string>",
+      "verification_strategy": ["<strategy>"]
+    }
+  ]
+}
+```
+
+---
+
 ## Responsibilities
 
-- Receive a finding hypothesis with its evidence and severity
-- Select an appropriate verification strategy
-- Execute the verification using deterministic tools or targeted tests
-- Record the result with supporting evidence
+- Receive a batch of finding hypotheses with their evidence and severity
+- Select appropriate verification strategies
+- Execute verification using deterministic tools or targeted tests
+- Reuse existing deterministic tool results when they already prove or refute a claim
+- Record results with supporting evidence
 - Write structured results to `verification-results.json`
 
 The verifier is a skeptic. It must treat every finding as "unconfirmed until proven."
+
+---
+
+## Verification Priority Within a Batch
+
+```
+1. CRITICAL severity findings
+2. HIGH severity findings
+3. MEDIUM severity findings (when confidence != CERTAIN or evidence is thin)
+```
+
+LOW and INFO findings are **not included** in the verification batch.
+
+---
+
+## Deterministic Shortcut
+
+If a finding already has proof from the orchestrator's deterministic pre-scan:
+- A Bandit match
+- A Semgrep match
+- A failing targeted test
+- A pip-audit CVE result
+- A direct code-path proof in the finding evidence
+
+Do NOT re-run the same tool. Consume the existing result.
+Record the method as the appropriate strategy and status as VERIFIED.
 
 ---
 
@@ -50,35 +117,13 @@ REFUTED              — Verification demonstrated the problem does not occur
 
 ---
 
-## Verification Priority
-
-```
-1. CRITICAL severity findings
-2. HIGH severity findings
-3. MEDIUM severity findings
-4. LOW severity findings (only when verification cost is low)
-```
-
----
-
 ## Inputs
 
 ```
 reports/context/<pr-id>/pr-context.json
-reports/findings/<pr-id>/*.json  (all specialist findings)
+reports/context/<pr-id>/context-package.json  (pre-scan results available here)
+reports/findings/<pr-id>/*.json               (all specialist findings)
 Source files referenced by findings (read-only)
-```
-
-Input format per finding:
-
-```json
-{
-  "finding_id": "<string>",
-  "claim": "<string>",
-  "evidence": ["<string>"],
-  "severity": "<string>",
-  "verification_strategy": ["<strategy>"]
-}
 ```
 
 ---
@@ -105,6 +150,7 @@ Input format per finding:
 - Marking a finding REFUTED based only on absence of evidence
 - Creating commits, pushing, or publishing to GitHub
 - Adding verification tests to the official project test suite
+- Re-running a deterministic tool that already produced a result in context-package.json
 
 ---
 
@@ -158,9 +204,10 @@ reports/verification/<pr-id>/tests/*  (when targeted tests are created)
 
 The verifier's work is complete when:
 
-- All CRITICAL and HIGH findings have been processed
-- All MEDIUM findings have been processed (or documented as VERIFICATION_FAILED
-  when environment constraints prevent it)
+- All CRITICAL findings in the batch have been processed
+- All HIGH findings in the batch have been processed
+- MEDIUM findings included in the batch have been processed
 - `verification-results.json` is written and schema-valid
 - Every result has a `status`, `method`, and `evidence` array (non-empty for
   VERIFIED and REFUTED results)
+- Pre-scan results were consumed where applicable (not re-run)
