@@ -7,6 +7,7 @@ from typing import Any
 
 def load_findings(
     findings_dir: Path,
+    selected_reviewers: list[str],
 ) -> list[dict[str, Any]]:
 
     findings: list[dict[str, Any]] = []
@@ -14,9 +15,8 @@ def load_findings(
     if not findings_dir.exists():
         return findings
 
-    for file in sorted(
-        findings_dir.glob("*.json")
-    ):
+    for reviewer in selected_reviewers:
+        file = findings_dir / f"{reviewer}.json"
         data = json.loads(
             file.read_text(
                 encoding="utf-8"
@@ -101,6 +101,7 @@ def build_report_markdown(
     context: dict[str, Any],
     review_plan: dict[str, Any],
     findings: list[dict[str, Any]],
+    style_review: dict[str, Any],
 ) -> str:
 
     blocking, advisory = (
@@ -136,6 +137,7 @@ def build_report_markdown(
         f"- Additions: {context.get('additions', 0)}",
         f"- Deletions: {context.get('deletions', 0)}",
         f"- Findings: {len(findings)}",
+        f"- Python convention issues: {len(style_review['findings'])}",
         f"- Blocking: {len(blocking)}",
         f"- Advisory: {len(advisory)}",
         "",
@@ -168,6 +170,22 @@ def build_report_markdown(
         lines.append(
             "No specific risk triggers detected."
         )
+
+    lines.extend([
+        "",
+        "## Python Conventions",
+        "",
+    ])
+    if style_review["checked_files"] == 0:
+        lines.append("No changed Python files to check.")
+    elif style_review["findings"]:
+        for issue in style_review["findings"]:
+            lines.append(
+                f"- `{issue['file']}:{issue['line']}` — "
+                f"{issue['code']}: {issue['message']}"
+            )
+    else:
+        lines.append("No convention issues found on changed Python lines.")
 
     lines.extend([
         "",
@@ -215,11 +233,12 @@ def build_report_markdown(
         )
     elif advisory:
         lines.append(
-            "The review contains advisory findings but no verified blocking findings."
+            "The review contains advisory findings but no verified "
+            "blocking findings."
         )
     else:
         lines.append(
-            "No concrete findings were identified."
+            "No behavioral findings were identified."
         )
 
     lines.extend([
@@ -236,6 +255,7 @@ def write_report(
     pr_id: str,
     context: dict[str, Any],
     review_plan: dict[str, Any],
+    style_review: dict[str, Any],
 ) -> None:
 
     findings_dir = (
@@ -245,7 +265,8 @@ def write_report(
     )
 
     findings = load_findings(
-        findings_dir
+        findings_dir,
+        review_plan.get("selected_reviewers", []),
     )
 
     blocking, advisory = (
@@ -269,6 +290,7 @@ def write_report(
         ),
         "blocking": blocking,
         "advisory": advisory,
+        "python_conventions": style_review,
     }
 
     review_dir = (
@@ -298,6 +320,7 @@ def write_report(
         context=context,
         review_plan=review_plan,
         findings=findings,
+        style_review=style_review,
     )
 
     (

@@ -7,6 +7,7 @@ from pathlib import Path
 from .git_diff import get_pr_diff
 from .reports import write_report
 from .specialists import run_specialist
+from .style_review import review_python_style
 from .triage import run_triage
 
 
@@ -138,7 +139,12 @@ def run(
 
     all_findings = []
 
-    if plan["selected_reviewers"]:
+    python_files = any(
+        item["path"].endswith(".py") and item["status"] != "removed"
+        for item in context["changed_files"]
+    )
+    diff = ""
+    if plan["selected_reviewers"] or python_files:
 
         owner, repo = parse_repository(
             context
@@ -153,6 +159,8 @@ def run(
             repo,
             int(pr_id),
         )
+
+    if plan["selected_reviewers"]:
 
         print(
             "[4/5] Running specialists..."
@@ -189,13 +197,22 @@ def run(
             )
 
     else:
-        print(
-            "[3/5] No specialist required."
-        )
+        if not python_files:
+            print("[3/5] No diff required.")
 
         print(
             "[4/5] Specialist review skipped."
         )
+
+    style_review = {"checked_files": 0, "findings": []}
+    if python_files:
+        print("[4/5] Checking Python conventions...")
+        style_review = review_python_style(context, diff)
+
+    write_json(
+        REPORTS / "style" / pr_id / "pep8.json",
+        style_review,
+    )
 
     print(
         "[5/5] Generating final report..."
@@ -206,6 +223,7 @@ def run(
         pr_id=pr_id,
         context=context,
         review_plan=plan,
+        style_review=style_review,
     )
 
     print(
@@ -216,6 +234,11 @@ def run(
         f"Findings: "
         f"{len(all_findings)}"
     )
+
+    if python_files:
+        print(f"Python conventions: {len(style_review['findings'])} issues")
+    else:
+        print("Python conventions: skipped (no changed Python files)")
 
     for finding in all_findings:
         print(

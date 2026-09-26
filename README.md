@@ -24,6 +24,8 @@ specialist loop (Ollama, one per selected reviewer)
         ↓
 reports/findings/<pr-id>/<specialist>.json
         ↓
+Python conventions (Ruff, changed lines only) → reports/style/<pr-id>/pep8.json
+        ↓
 reports/reviews/<pr-id>/review.json + review.md
 ```
 
@@ -47,6 +49,7 @@ pr_guardian/           Python backend
     ├── specialists.py Calls Ollama for each selected specialist
     ├── ollama_client.py HTTP client for Ollama /api/chat (JSON mode)
     ├── git_diff.py    Fetches the unified diff via GitHub API
+    ├── style_review.py Checks changed Python lines with Ruff
     ├── reports.py     Builds review.json and review.md
     └── prompts.py     Loads global-rules.md and skill SKILL.md files
 
@@ -57,6 +60,7 @@ reports/               Generated artifacts (git-ignored)
 ├── context/<pr-id>/pr-context.json
 ├── plans/<pr-id>/review-plan.json
 ├── findings/<pr-id>/<specialist>.json
+├── style/<pr-id>/pep8.json
 └── reviews/<pr-id>/review.json + review.md
 
 .bob/                  Bob IDE layer
@@ -78,6 +82,7 @@ reports/               Generated artifacts (git-ignored)
 | [Ollama](https://ollama.ai) | Local LLM inference |
 | `requests` | HTTP calls to GitHub and Ollama |
 | `python-dotenv` | `.env` loading |
+| `ruff` | Python convention checks on changed PR lines |
 | `gh` CLI *(optional)* | Primary PR metadata collection |
 | `curl` + `bash` | REST API fallback in the collection script |
 
@@ -146,6 +151,7 @@ Reviewers: ['code-review-specialist', 'security-review-specialist']
 [5/5] Generating final report...
 [5/5] Review finished.
 Findings: 3
+Python conventions: 2 issues
 CODE-001 HIGH ...
 SEC-001 MEDIUM ...
 Report: reports/reviews/42/review.md
@@ -191,8 +197,11 @@ All outputs are written under `reports/` and are git-ignored.
 | `reports/context/<pr-id>/pr-context.json` | Raw PR metadata from collection |
 | `reports/plans/<pr-id>/review-plan.json` | Triage output: risk level, selected reviewers, agent budget |
 | `reports/findings/<pr-id>/<specialist>.json` | Raw findings per specialist |
+| `reports/style/<pr-id>/pep8.json` | Ruff results for changed Python lines |
 | `reports/reviews/<pr-id>/review.json` | Synthesised review (blocking + advisory) |
 | `reports/reviews/<pr-id>/review.md` | Human-readable review report |
+
+Python convention checks run independently of triage when a PR changes Python files. Ruff checks the complete file at the PR head SHA with `E`, `W`, and `N` rules and a 79-character line limit; the report includes only diagnostics on added or modified lines. Convention issues appear in a separate report section and do not count as behavioral findings.
 
 ### Finding schema
 
