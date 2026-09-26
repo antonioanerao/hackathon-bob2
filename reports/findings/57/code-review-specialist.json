@@ -1,13 +1,6 @@
 {
-  "pr_id": 57,
-  "repository": "mp-ac/verifica-ai",
-  "risk_level": "MEDIUM",
-  "selected_reviewers": [
-    "code-review-specialist",
-    "api-review-specialist"
-  ],
-  "blocking": [],
-  "advisory": [
+  "specialist": "code-review-specialist",
+  "findings": [
     {
       "id": "CODE-001",
       "severity": "MEDIUM",

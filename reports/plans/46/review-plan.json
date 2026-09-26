@@ -1,29 +1,12 @@
 {
-  "pr_id": 46,
   "risk_level": "LOW",
-  "risk_triggers": ["BACKGROUND_JOB_CHANGED"],
   "agent_budget": {
     "max_reviewers": 1,
     "max_verifiers": 0
   },
-  "selected_reviewers": ["code-review-specialist"],
-  "skipped_reviewers": [
-    "security-review-specialist",
-    "database-review-specialist",
-    "api-review-specialist",
-    "async-review-specialist",
-    "architecture-review-specialist"
+  "risk_triggers": [],
+  "selected_reviewers": [
+    "code-review-specialist"
   ],
-  "routing_rationale": {
-    "code-review-specialist": "Core behavioral change: new formatting logic, new state field, removal of media_contexts lookup at two call sites, conditional assembly of format_youtube_research_query parts. Test coverage added but correctness of truncation, segment iteration, and state propagation should be verified.",
-    "security-review-specialist": "No auth/crypto/input-validation surfaces touched.",
-    "database-review-specialist": "No DB schema or query changes.",
-    "api-review-specialist": "No HTTP route or schema changes.",
-    "async-review-specialist": "Graph nodes are not queue/worker changes.",
-    "architecture-review-specialist": "No module-boundary or dependency-direction changes."
-  },
-  "verification_plan": {
-    "run_verifier": false,
-    "reason": "LOW risk, no CRITICAL/HIGH findings expected; verifier budget is 0."
-  }
+  "skipped_reviewers": []
 }
