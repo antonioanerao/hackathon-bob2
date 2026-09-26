@@ -1,234 +1,455 @@
 # PR Guardian
 
 > Load knowledge lazily, not globally.  
-> Don't just comment. Prove it.
+> Reviewers find. Verifier proves. Python enforces.
 
-PR Guardian is an evidence-based Pull Request review harness for IBM Bob.
+PR Guardian is an evidence-based Pull Request review harness designed to analyze code changes using local LLM inference.
 
-Its goals are:
+The project can use the same declarative definitions originally designed for IBM Bob:
 
-- minimize agents, context, and tool calls
-- review only relevant areas
-- require concrete evidence
+- rules
+- skills
+- commands
+- custom modes
+
+while executing the review pipeline locally through Python and Ollama.
+
+The primary goals are:
+
+- run Pull Request reviews locally
+- minimize unnecessary model inference
+- analyze only relevant parts of the PR
+- dynamically select specialist reviewers
+- require concrete evidence for every finding
+- reduce hallucinated findings
 - keep production code read-only
-- produce auditable artifacts
+- generate structured and auditable artifacts
+- produce a deterministic final Markdown report
+- keep orchestration independent from the selected LLM
 
 ---
 
-## Architecture
+# Core Principles
+
+PR Guardian follows four core principles:
+
+> Collect once. Reuse everywhere.
+
+> Load knowledge lazily, not globally.
+
+> Reviewers find. Verifier proves.
+
+> Python enforces.
+
+The LLM performs reasoning.
+
+Python controls:
+
+- execution
+- validation
+- routing
+- persistence
+- output schemas
+- failure handling
+- final reporting
+
+---
+
+# Architecture
 
 ```text
-/pr-guardian-review
+GitHub Pull Request
         ↓
-pr-guardian-orchestrator
+collect-pr-context.sh
+        ↓
+PR context
+        ↓
+Ollama
         ↓
 pr-triage
         ↓
 review-plan.json
         ↓
-selected specialists as subagents
+selected specialists
         ↓
-findings returned to orchestrator
+Ollama specialist inference
+        ↓
+canonical findings
+        ↓
+Python validation
+        ↓
+reports/findings/
         ↓
 finding-verifier (optional)
         ↓
-orchestrator synthesis
+Python synthesis
         ↓
 review.json
 review.md
 run-manifest.json
 ```
 
-The orchestrator uses the minimum number of agents required.
+The orchestrator controls the complete lifecycle.
 
-The parent session remains in `pr-guardian-orchestrator` mode during specialist execution.
+Specialists do not control orchestration.
+
+Specialists only:
+
+1. receive relevant PR context
+2. receive their domain skill
+3. inspect the supplied changed code
+4. return structured findings
 
 ---
 
-## Project Structure
+# Local Runtime
+
+PR Guardian runs locally using:
 
 ```text
-.bob/
-├── commands/
-│   ├── pr-guardian-review.md
-│   ├── pr-guardian-verify.md
-│   └── pr-guardian-report.md
-│
-├── rules-agent/
-│   └── global-rules.md
-│
-├── rules-pr-guardian-orchestrator/
-│   └── orchestrator-rules.md
-│
-├── skills/
-│   ├── pr-triage/
-│   │   └── SKILL.md
-│   ├── code-review/
-│   │   └── SKILL.md
-│   ├── security-review/
-│   │   └── SKILL.md
-│   ├── database-review/
-│   │   └── SKILL.md
-│   ├── api-review/
-│   │   └── SKILL.md
-│   ├── architecture-review/
-│   │   └── SKILL.md
-│   ├── queue-review/
-│   │   └── SKILL.md
-│   └── finding-verification/
-│       └── SKILL.md
-│
-└── custom_modes.yaml
+Python
++
+Ollama
++
+Local LLM
++
+GitHub API
 ```
 
-Helper:
+Example models:
 
 ```text
-scripts/
-└── collect-pr-context.sh
+qwen2.5-coder:7b
+qwen2.5-coder:14b
 ```
 
-Generated artifacts:
+The selected model is configured through `.env`.
 
-```text
-reports/
-├── context/
-├── plans/
-├── findings/
-├── verification/
-├── reviews/
-└── runs/
+Example:
+
+```env
+OLLAMA_MODEL=qwen2.5-coder:14b
+OLLAMA_URL=http://127.0.0.1:11500
 ```
 
 ---
 
-## Commands
+# Project Structure
 
-| Command | Mode | Purpose |
-|---|---|---|
-| `/pr-guardian-review <ref>` | `pr-guardian-orchestrator` | Full PR review |
-| `/pr-guardian-verify <pr-id>` | `finding-verifier` | Re-verify unresolved findings |
-| `/pr-guardian-report <pr-id>` | `pr-guardian-orchestrator` | Rebuild reports from existing artifacts |
+```text
+pr-guardian/
+│
+├── .bob/
+│   │
+│   ├── commands/
+│   │   ├── pr-guardian-review.md
+│   │   ├── pr-guardian-verify.md
+│   │   └── pr-guardian-report.md
+│   │
+│   ├── rules-agent/
+│   │   └── global-rules.md
+│   │
+│   ├── rules-pr-guardian-orchestrator/
+│   │   └── orchestrator-rules.md
+│   │
+│   ├── skills/
+│   │   ├── pr-triage/
+│   │   │   └── SKILL.md
+│   │   ├── code-review/
+│   │   │   └── SKILL.md
+│   │   ├── security-review/
+│   │   │   └── SKILL.md
+│   │   ├── database-review/
+│   │   │   └── SKILL.md
+│   │   ├── api-review/
+│   │   │   └── SKILL.md
+│   │   ├── architecture-review/
+│   │   │   └── SKILL.md
+│   │   ├── queue-review/
+│   │   │   └── SKILL.md
+│   │   └── finding-verification/
+│   │       └── SKILL.md
+│   │
+│   └── custom_modes.yaml
+│
+├── pr_guardian/
+│   │
+│   ├── main.py
+│   │
+│   └── app/
+│       ├── __init__.py
+│       ├── config.py
+│       ├── ollama_client.py
+│       ├── prompts.py
+│       ├── triage.py
+│       ├── specialists.py
+│       ├── git_diff.py
+│       ├── reports.py
+│       └── orchestrator.py
+│
+├── scripts/
+│   └── collect-pr-context.sh
+│
+├── reports/
+│
+├── .env
+├── requirements.txt
+└── README.md
+```
+
+---
+
+# Declarative Layer
+
+The `.bob/` directory remains the declarative definition of PR Guardian.
+
+It defines:
+
+```text
+rules
+skills
+commands
+agent responsibilities
+review behavior
+verification behavior
+```
+
+The local Python runtime consumes these definitions.
+
+This means the same review logic can be reused by different runtimes.
+
+Conceptually:
+
+```text
+                     PR Guardian
+                         │
+                declarative layer
+                         │
+                    .bob/*
+                         │
+              ┌──────────┴──────────┐
+              │                     │
+          IBM Bob             Local Runtime
+                                    │
+                                  Python
+                                    │
+                                  Ollama
+```
+
+---
+
+# Environment Configuration
+
+Runtime configuration is stored in `.env`.
+
+Example:
+
+```env
+PR_URL=https://github.com/owner/repository/pull/42
+
+OLLAMA_MODEL=qwen2.5-coder:14b
+OLLAMA_URL=http://127.0.0.1:11500
+
+GITHUB_TOKEN=
+
+PR_GUARDIAN_SPECIALISTS=code-review-specialist:code-review,security-review-specialist:security-review,database-review-specialist:database-review,api-review-specialist:api-review,architecture-review-specialist:architecture-review,async-review-specialist:queue-review
+```
+
+---
+
+# Dynamic Specialists
+
+Specialists are configured through:
+
+```env
+PR_GUARDIAN_SPECIALISTS=
+```
+
+Format:
+
+```text
+reviewer-name:skill-name
+```
 
 Example:
 
 ```text
-/pr-guardian-review https://github.com/owner/repository/pull/42
+code-review-specialist:code-review
 ```
 
----
+Multiple specialists are separated by commas.
 
-## Modes
+Example:
 
-| Mode | Responsibility |
-|---|---|
-| `pr-guardian-orchestrator` | Triage, routing, coordination, persistence, and synthesis |
-| `code-review-specialist` | Correctness and regressions |
-| `security-review-specialist` | Security vulnerabilities |
-| `database-review-specialist` | Database and persistence risks |
-| `api-review-specialist` | API contract risks |
-| `architecture-review-specialist` | Structural regressions |
-| `async-review-specialist` | Queue and background-job reliability |
-| `finding-verifier` | Verify or refute findings |
+```env
+PR_GUARDIAN_SPECIALISTS=code-review-specialist:code-review,security-review-specialist:security-review
+```
 
-Specialists run only when selected by triage.
+The runtime converts this configuration into:
 
-Selected specialists run as isolated subagents.
+```python
+{
+    "code-review-specialist": "code-review",
+    "security-review-specialist": "security-review"
+}
+```
 
-The parent session must not switch into specialist modes.
+This removes hardcoded specialist definitions from the Python code.
 
 ---
 
-## Skills
+# Adding a New Specialist
 
-| Skill | Purpose |
-|---|---|
-| `pr-triage` | Context, impact, risk, and routing |
-| `code-review` | Logic and regressions |
-| `security-review` | Security analysis |
-| `database-review` | Persistence risks |
-| `api-review` | API contracts |
-| `architecture-review` | Structural analysis |
-| `queue-review` | Async and queue reliability |
-| `finding-verification` | Finding verification |
-
-Only `pr-triage` is loaded initially.
-
-Specialist skills are loaded only after routing.
-
-`finding-verification` is loaded only when verification is justified.
-
----
-
-## Review Flow
-
-### 1. Discovery
-
-Run:
+Create a skill:
 
 ```text
+.bob/skills/performance-review/SKILL.md
+```
+
+Then add it to `.env`:
+
+```env
+PR_GUARDIAN_SPECIALISTS=...,performance-review-specialist:performance-review
+```
+
+No modification to `specialists.py` should be required.
+
+The execution flow becomes:
+
+```text
+.env
+ ↓
+get_specialists()
+ ↓
+triage receives available reviewers
+ ↓
+LLM selects relevant reviewers
+ ↓
+orchestrator executes selected specialists
+ ↓
+skill is loaded lazily
+```
+
+Adding a skill does not mean that it will always execute.
+
+It only becomes available for selection.
+
+---
+
+# Review Pipeline
+
+## 1. PR Context Collection
+
+PR context is collected once using:
+
+```bash
 scripts/collect-pr-context.sh "<pr-ref>"
 ```
 
-once.
-
-Supported references:
+Supported formats:
 
 ```text
 owner/repository#42
+```
+
+or:
+
+```text
 https://github.com/owner/repository/pull/42
 ```
 
-Successful collection is the primary source for:
+The collector retrieves only compact metadata.
 
-- PR metadata
-- base/head SHA
-- changed files
-- repository tech hints
+Typical output includes:
 
-Do not rediscover information already collected.
+```text
+PR number
+title
+description preview
+base SHA
+head SHA
+changed files
+additions
+deletions
+repository hints
+```
 
-Use at most one fallback when collection fails or is incomplete.
+The complete diff is not stored in `pr-context.json`.
 
 ---
 
-### 2. Triage
+# 2. Context Artifact
 
-`pr-triage` determines:
-
-- what changed
-- what may be affected
-- risk level
-- risk triggers
-- selected reviewers
-- agent budget
-
-It writes:
+The orchestrator persists:
 
 ```text
 reports/context/<pr-id>/pr-context.json
-reports/context/<pr-id>/impact-map.json
-reports/plans/<pr-id>/review-plan.json
 ```
 
-Context should be collected once and reused.
+Example:
+
+```json
+{
+  "pr_id": 42,
+  "repository_name": "owner/repository",
+  "title": "Improve duplicate detection",
+  "base_sha": "...",
+  "head_sha": "...",
+  "additions": 75,
+  "deletions": 20,
+  "changed_files_count": 3
+}
+```
 
 ---
 
-### 3. Routing
+# 3. PR Triage
 
-Routing:
+`pr-triage` runs through Ollama.
+
+The triage receives:
 
 ```text
-behavior      → code-review-specialist
-security      → security-review-specialist
-database      → database-review-specialist
-API           → api-review-specialist
-async/queue   → async-review-specialist
-architecture  → architecture-review-specialist
+global rules
++
+pr-triage skill
++
+PR context
++
+available reviewers
 ```
 
-Agent limits:
+Its responsibilities are limited to:
+
+```text
+understand the change
+determine risk
+identify risk triggers
+select reviewers
+define agent budget
+```
+
+It must not perform specialist review.
+
+---
+
+# Risk Levels
+
+Valid risk levels:
+
+| Risk | Description |
+|---|---|
+| `TRIVIAL` | Documentation or metadata only |
+| `LOW` | Small isolated behavioral change |
+| `MEDIUM` | Limited functional change |
+| `HIGH` | Security, database, API, queue, or critical boundary |
+| `CRITICAL` | Severe security, tenant, crypto, or data-integrity risk |
+
+---
+
+# Agent Budget
+
+Default policy:
 
 | Risk | Max Reviewers | Max Verifiers |
 |---|---:|---:|
@@ -238,44 +459,245 @@ Agent limits:
 | `HIGH` | 3 | 1 |
 | `CRITICAL` | 4 | 1 |
 
-Budget is a maximum, not a target.
+The budget is a ceiling.
+
+It is not a target.
+
+PR Guardian should never execute reviewers simply to consume the available budget.
 
 ---
 
-## Specialist Review
+# Triage Output
 
-Each selected specialist:
+The triage returns structured JSON:
 
-- runs as an isolated subagent
-- receives only relevant context
-- loads only its domain skill
-- reviews independently
-- does not receive findings from other specialists
-- does not execute tests or scanners
-- returns canonical findings JSON to the orchestrator
-
-Specialists do not write findings artifacts directly.
-
-The orchestrator persists returned findings under:
-
-```text
-reports/findings/<pr-id>/code-review-specialist.json
-reports/findings/<pr-id>/security-review-specialist.json
-reports/findings/<pr-id>/database-review-specialist.json
-reports/findings/<pr-id>/api-review-specialist.json
-reports/findings/<pr-id>/architecture-review-specialist.json
-reports/findings/<pr-id>/async-review-specialist.json
+```json
+{
+  "risk_level": "LOW",
+  "agent_budget": {
+    "max_reviewers": 1,
+    "max_verifiers": 0
+  },
+  "risk_triggers": [],
+  "selected_reviewers": [
+    "code-review-specialist"
+  ],
+  "skipped_reviewers": [
+    "security-review-specialist",
+    "database-review-specialist",
+    "api-review-specialist",
+    "architecture-review-specialist",
+    "async-review-specialist"
+  ]
+}
 ```
 
-Only selected specialists produce findings artifacts.
+The runtime validates reviewer names against the specialists configured in `.env`.
 
-If a specialist lacks a tool, it must return its completed findings instead of attempting mode switching or unrelated fallbacks.
+Invalid reviewers are rejected.
+
+Examples of invalid output:
+
+```text
+@developer1
+john
+security-team
+reviewer-1
+```
 
 ---
 
-## Findings
+# 4. Review Plan
 
-Every finding must include:
+The orchestrator persists:
+
+```text
+reports/plans/<pr-id>/review-plan.json
+```
+
+This becomes the authoritative routing plan for the review.
+
+---
+
+# 5. Lazy Diff Loading
+
+The PR diff is loaded only after triage determines that specialist review is required.
+
+```text
+triage
+   ↓
+reviewers selected?
+   │
+   ├── no → report
+   │
+   └── yes
+        ↓
+      load diff
+```
+
+This prevents unnecessary context loading.
+
+---
+
+# 6. Specialist Execution
+
+Each selected specialist receives:
+
+```text
+global rules
++
+its own SKILL.md
++
+PR context
++
+changed code
+```
+
+A specialist does not receive:
+
+```text
+other specialists' findings
+other unrelated skills
+unrelated repository context
+```
+
+This preserves reviewer independence.
+
+---
+
+# Specialist Responsibilities
+
+## Code Review
+
+Focus:
+
+```text
+logic
+regressions
+error handling
+state
+nullability
+resources
+concurrency
+edge cases
+```
+
+---
+
+## Security Review
+
+Focus:
+
+```text
+authentication
+authorization
+tenant isolation
+injection
+SSRF
+path traversal
+secrets
+cryptography
+unsafe input
+dependency risks
+```
+
+---
+
+## Database Review
+
+Focus:
+
+```text
+migrations
+schema
+queries
+indexes
+transactions
+constraints
+locking
+referential integrity
+```
+
+---
+
+## API Review
+
+Focus:
+
+```text
+routes
+request schemas
+response schemas
+HTTP semantics
+OpenAPI
+validation
+authorization
+backward compatibility
+```
+
+---
+
+## Async Review
+
+Focus:
+
+```text
+queues
+workers
+tasks
+retries
+idempotency
+duplicate delivery
+acknowledgment
+ordering
+DLQ
+partial failure
+timeouts
+```
+
+---
+
+## Architecture Review
+
+Focus:
+
+```text
+module boundaries
+dependency direction
+coupling
+cohesion
+circular dependencies
+responsibility movement
+```
+
+---
+
+# Finding Gate
+
+Specialists must not report observations merely because something could theoretically be improved.
+
+A finding should exist only when the PR introduces or exposes a concrete defect or regression.
+
+Do not report:
+
+```text
+style preferences
+readability suggestions
+hypothetical future misuse
+generic best practices
+defensive improvements
+missing tests without behavioral impact
+pre-existing issues
+unsupported security concerns
+```
+
+When one targeted inspection can confirm or reject a suspicion, the specialist should perform that inspection before emitting the finding.
+
+---
+
+# Canonical Finding Schema
+
+Every finding must contain:
 
 ```text
 id
@@ -307,37 +729,30 @@ Example:
 }
 ```
 
-Emit findings only for concrete defects or regressions introduced or exposed by the PR.
+---
 
-Do not emit speculative findings when one targeted read can confirm or refute them.
+# Finding Severity
 
-Do not report:
+Valid severities:
 
-- style-only observations
-- hypothetical future misuse
-- defensive improvements
-- missing tests without concrete behavioral risk
-- pre-existing issues as introduced
+```text
+LOW
+MEDIUM
+HIGH
+CRITICAL
+```
 
-If no concrete defects exist, return an empty findings list.
+Severity should represent practical impact.
+
+It must not represent reviewer confidence.
+
+Confidence and verification are separate concepts.
 
 ---
 
-## Verification
+# Verification Status
 
-Verification is independent from specialist review.
-
-Verify by default only:
-
-```text
-CRITICAL
-HIGH
-selected uncertain MEDIUM
-```
-
-`LOW` and `INFO` are not verified by default.
-
-Possible statuses:
+Valid statuses:
 
 ```text
 VERIFIED
@@ -347,49 +762,199 @@ NOT_APPLICABLE
 VERIFICATION_FAILED
 ```
 
-`VERIFIED` and `REFUTED` require concrete evidence.
+Specialists normally return:
 
-Absence of proof is not evidence of refutation.
+```text
+UNVERIFIED
+```
 
-Prefer existing evidence before executing commands.
+Verification may later promote the finding to:
 
-Verification should use the minimum files and commands required.
+```text
+VERIFIED
+```
 
-Output:
+or:
+
+```text
+REFUTED
+```
+
+---
+
+# Specialist Output
+
+The specialist returns JSON to the orchestrator.
+
+Example:
+
+```json
+{
+  "specialist": "code-review-specialist",
+  "findings": [
+    {
+      "id": "CODE-001",
+      "severity": "MEDIUM",
+      "category": "STATE_REGRESSION",
+      "title": "State can become inconsistent",
+      "file": "src/service.py",
+      "line": 91,
+      "evidence": "...",
+      "impact": "...",
+      "recommendation": "...",
+      "verification_status": "UNVERIFIED"
+    }
+  ]
+}
+```
+
+If nothing concrete is found:
+
+```json
+{
+  "specialist": "code-review-specialist",
+  "findings": []
+}
+```
+
+---
+
+# Artifact Persistence
+
+Specialists do not write artifacts directly.
+
+The Python orchestrator persists results.
+
+Example:
+
+```text
+reports/findings/<pr-id>/code-review-specialist.json
+```
+
+This keeps persistence outside LLM control.
+
+---
+
+# Verification
+
+Verification is a separate stage.
+
+The verifier consumes existing findings.
+
+It must not search for new bugs.
+
+Recommended verification candidates:
+
+```text
+CRITICAL
+HIGH
+selected uncertain MEDIUM
+```
+
+LOW findings are normally not verified.
+
+---
+
+# Verification Principle
+
+> Reviewers find. Verifier proves.
+
+Verification should attempt to answer:
+
+```text
+Is this finding actually supported by available evidence?
+```
+
+Possible methods:
+
+```text
+STATIC_ANALYSIS
+TARGETED_TEST
+INTEGRATION_TEST
+CONFIG_INSPECTION
+DEPENDENCY_ANALYSIS
+CODE_PATH_PROOF
+MANUAL_EVIDENCE
+```
+
+---
+
+# Verification Artifact
+
+If verification executes:
 
 ```text
 reports/verification/<pr-id>/verification-results.json
 ```
 
-Temporary verification tests may only be written under:
+Example:
 
-```text
-reports/verification/<pr-id>/tests/
+```json
+{
+  "results": [
+    {
+      "finding_id": "SEC-001",
+      "status": "VERIFIED",
+      "method": "CODE_PATH_PROOF",
+      "evidence": "..."
+    }
+  ]
+}
 ```
 
 ---
 
-## Synthesis
+# Deterministic Final Report
 
-Final synthesis runs in the orchestrator.
+The final report is generated by Python.
 
-The orchestrator:
+The LLM does not generate the final Markdown structure.
 
-1. loads findings
-2. applies verification results
-3. removes `REFUTED` findings
-4. deduplicates by root cause
-5. classifies final findings
-6. writes final artifacts
+This provides:
 
-Classification:
+```text
+predictable formatting
+stable output
+lower inference cost
+less hallucination
+easier testing
+better auditability
+```
+
+---
+
+# Final Classification
+
+After optional verification:
+
+```text
+REFUTED
+    ↓
+removed from active findings
+```
+
+Blocking:
+
+```text
+VERIFIED
++
+CRITICAL or HIGH
+```
+
+Everything else remains advisory.
+
+Therefore:
 
 ```text
 BLOCKING = VERIFIED + CRITICAL|HIGH
 ADVISORY = remaining active findings
 ```
 
-Outputs:
+---
+
+# Final Artifacts
+
+The review produces:
 
 ```text
 reports/reviews/<pr-id>/review.json
@@ -397,64 +962,66 @@ reports/reviews/<pr-id>/review.md
 reports/runs/<pr-id>/run-manifest.json
 ```
 
-If verification did not run, applicable findings remain `UNVERIFIED`.
+---
+
+# Markdown Report
+
+Example:
+
+```markdown
+# PR Guardian Review — PR #42
+
+**Repository:** `owner/repository`
+
+**Risk Level:** `LOW`
+
+## Summary
+
+- Changed files: 3
+- Findings: 1
+- Blocking: 0
+- Advisory: 1
+
+## Reviewers
+
+- `code-review-specialist`
+
+## Blocking Findings
+
+No verified blocking findings.
+
+## Advisory Findings
+
+### CODE-001 — Possible state regression
+
+- Severity: `MEDIUM`
+- Verification: `UNVERIFIED`
+- File: `src/service.py:91`
+
+**Evidence**
+
+...
+
+**Impact**
+
+...
+
+**Recommendation**
+
+...
+
+## Review Result
+
+The review contains advisory findings but no verified blocking findings.
+```
 
 ---
 
-## Limits
-
-Default limits:
-
-```text
-discovery commands    max 2
-initial file reads    max 3
-files per specialist  max 5
-pre-scan tools        max 2
-verifier runs         max 1
-```
-
-Exceed a limit only for a concrete risk or finding hypothesis.
-
-Prefer batched operations over repeated calls.
-
-Do not run full test suites by default.
-
----
-
-## Rules
-
-Global rules:
-
-```text
-.bob/rules-agent/global-rules.md
-```
-
-Orchestrator rules:
-
-```text
-.bob/rules-pr-guardian-orchestrator/orchestrator-rules.md
-```
-
-Core invariants:
-
-- production code is read-only
-- evidence is required
-- repository exploration is bounded
-- only selected specialists run
-- specialists run as isolated subagents
-- the parent orchestrator remains active
-- specialists do not receive findings from other specialists
-- specialists return findings to the orchestrator
-- deterministic evidence is reused
-- artifacts are written only under allowed `reports/` paths
-- no commit, push, merge, publish, or automatic GitHub comment
-
----
-
-## Artifacts
+# Artifact Structure
 
 ```text
 reports/
+│
 ├── context/
 │   └── <pr-id>/
 │       ├── pr-context.json
@@ -488,40 +1055,121 @@ reports/
         └── run-manifest.json
 ```
 
-Artifacts must remain compact.
-
-Do not:
-
-- store the full diff
-- duplicate metadata unnecessarily
-- serialize empty optional structures without need
-
-Only selected specialists require findings artifacts.
+Only artifacts corresponding to executed stages are required.
 
 ---
 
-## Failure Handling
+# Production Safety
 
-If PR metadata cannot be collected, stop.
+Production code is read-only.
 
-If triage cannot produce `review-plan.json`, stop.
+PR Guardian must never:
+
+```text
+modify production code
+modify migrations
+modify application configuration
+commit
+push
+merge
+publish changes
+automatically comment on GitHub
+```
+
+Generated files must remain under:
+
+```text
+reports/
+```
+
+---
+
+# Evidence Rules
+
+Every reported finding requires concrete evidence.
+
+Valid evidence includes:
+
+```text
+changed file and line
+reachable code path
+schema evidence
+configuration evidence
+dependency evidence
+tool output
+targeted test result
+```
+
+Never fabricate:
+
+```text
+files
+symbols
+line numbers
+runtime behavior
+CVEs
+versions
+tool output
+query plans
+production data
+consumer behavior
+```
+
+---
+
+# Repository Exploration
+
+Repository exploration should remain bounded.
+
+Prefer:
+
+```text
+changed files
+direct callers
+related schemas
+related tests
+direct configuration dependencies
+```
+
+Avoid:
+
+```text
+broad repository scans
+unrelated modules
+large speculative searches
+repeated discovery
+```
+
+Expand scope only when a concrete hypothesis requires it.
+
+---
+
+# Failure Handling
+
+If PR metadata cannot be collected:
+
+```text
+STOP
+```
+
+If triage returns invalid JSON:
+
+```text
+FAIL TRIAGE
+```
+
+If triage returns an unknown reviewer:
+
+```text
+FAIL TRIAGE
+```
 
 If a specialist fails:
 
-- record the failure
-- continue when safe
-- expose the failure in `run-manifest.json`
-
-If a specialist cannot use a tool:
-
-- do not switch the parent session mode
-- do not attempt unrelated fallback tools
-- return completed findings to the orchestrator
-
-If verification cannot run:
-
 ```text
-VERIFICATION_FAILED
+record failure
+continue when safe
+expose failure in run-manifest.json
 ```
 
 If evidence is inconclusive:
@@ -530,28 +1178,189 @@ If evidence is inconclusive:
 UNVERIFIED
 ```
 
-Never fabricate tool output or evidence.
+If verification infrastructure fails:
+
+```text
+VERIFICATION_FAILED
+```
+
+Never transform lack of evidence into:
+
+```text
+REFUTED
+```
 
 ---
 
-## Completion
+# Ollama Configuration
 
-A review is complete only when:
+Example:
 
-- triage artifacts exist
-- every selected specialist returned findings
-- the orchestrator persisted selected specialist findings artifacts
-- verification completed or was explicitly skipped
-- `review.json` exists
-- `review.md` exists
-- `run-manifest.json` exists
+```env
+OLLAMA_MODEL=qwen2.5-coder:14b
+OLLAMA_URL=http://127.0.0.1:11500
+```
 
-For `TRIVIAL` reviews with no selected specialists, findings artifacts are not required.
+Start Ollama:
 
-Inline output does not replace required artifacts.
+```bash
+export OLLAMA_HOST=127.0.0.1:11500
+ollama serve
+```
+
+Test:
+
+```bash
+curl http://127.0.0.1:11500/api/tags
+```
 
 ---
 
-## Design Principle
+# Running PR Guardian
+
+Configure:
+
+```env
+PR_URL=https://github.com/owner/repository/pull/42
+```
+
+Then:
+
+```bash
+python3 main.py
+```
+
+Typical execution:
+
+```text
+[1/5] Collecting PR context...
+
+[2/5] Running triage...
+
+Risk: LOW
+Reviewers: ['code-review-specialist']
+
+[3/5] Loading PR diff...
+
+[4/5] Running specialists...
+
+  → code-review-specialist
+
+[5/5] Generating final report...
+
+[5/5] Review finished.
+
+Findings: 0
+
+Report:
+reports/reviews/42/review.md
+```
+
+---
+
+# Commands
+
+The command definitions remain useful as declarative workflow documentation.
+
+| Command | Purpose |
+|---|---|
+| `pr-guardian-review` | Full PR review |
+| `pr-guardian-verify` | Re-verify unresolved findings |
+| `pr-guardian-report` | Rebuild final reports |
+
+The local Python runtime may expose equivalent CLI commands independently from IBM Bob.
+
+---
+
+# Custom Modes
+
+`custom_modes.yaml` defines logical agent responsibilities.
+
+In local execution, modes can be treated as metadata describing:
+
+```text
+agent identity
+responsibility
+allowed behavior
+tool permissions
+expected outputs
+```
+
+The Python runtime remains responsible for enforcing actual execution boundaries.
+
+---
+
+# Security Boundary
+
+LLM output is untrusted input.
+
+Therefore every LLM response must be validated before use.
+
+The runtime should validate:
+
+```text
+JSON structure
+reviewer names
+finding schema
+severity
+verification status
+required fields
+artifact destination
+```
+
+The model must never directly decide filesystem destinations or executable commands.
+
+---
+
+# Completion Criteria
+
+A review is complete when:
+
+```text
+PR context exists
+review plan exists
+all selected specialists returned
+selected specialist artifacts were persisted
+verification completed or was skipped
+review.json exists
+review.md exists
+run-manifest.json exists
+```
+
+For a `TRIVIAL` review with no selected specialists:
+
+```text
+finding artifacts are not required
+```
+
+---
+
+# Design Principle
 
 > **One responsibility, one place.**
+
+```text
+LLM
+→ reasoning
+
+Skills
+→ domain instructions
+
+Rules
+→ invariants
+
+Triage
+→ routing
+
+Specialists
+→ findings
+
+Verifier
+→ evidence confirmation
+
+Python
+→ enforcement
+
+Reports
+→ deterministic output
+```
