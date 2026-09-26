@@ -1,0 +1,70 @@
+{
+  "pr_id": 46,
+  "repository": "mp-ac/verifica-ai",
+  "title": "fix: resolvido erro ao passar conteúdo extraído do youtube para o agente de buscas",
+  "risk_level": "LOW",
+  "verdict": "APPROVED_WITH_ADVISORY",
+  "blocking_findings": [],
+  "advisory_findings": [
+    {
+      "id": "CR-001",
+      "severity": "MEDIUM",
+      "status": "ADVISORY",
+      "title": "Empty-relevance segments silently skipped — no test coverage for all-empty case",
+      "location": "src/agents/youtube_agent/formatting.py",
+      "description": "If all segments have empty relevance, format_research_context returns an empty string without warning. Downstream guards handle this gracefully but the silent behaviour is untested.",
+      "suggestion": "Add a test for all-empty relevance strings. Optionally emit a log warning when no summaries are collected."
+    },
+    {
+      "id": "CR-003",
+      "severity": "LOW",
+      "status": "ADVISORY",
+      "title": "Unicode ellipsis (U+2026) in truncation — potential encoding edge case",
+      "location": "src/agents/youtube_agent/formatting.py",
+      "description": "_compact_summary appends U+2026 when truncating. Downstream ASCII-only consumers may fail. Python is UTF-8 by default and LLM APIs generally accept Unicode, but worth confirming.",
+      "suggestion": "Use '...' (three ASCII dots) or confirm UTF-8 is enforced end-to-end."
+    },
+    {
+      "id": "CR-004",
+      "severity": "LOW",
+      "status": "ADVISORY",
+      "title": "Off-by-one in truncation slice: 399 chars of content + ellipsis = 400 total",
+      "location": "src/agents/youtube_agent/formatting.py",
+      "description": "summary[:MAX_RESEARCH_SUMMARY_CHARS - 1] slices at index 399. If the intent was 400 chars of content plus the ellipsis, add one to the slice index. If the intent was 400 total chars, current code is correct — the constant comment should say so.",
+      "suggestion": "Clarify intent in a comment. Adjust slice if 400-char content (not total) was intended."
+    },
+    {
+      "id": "CR-005",
+      "severity": "LOW",
+      "status": "ADVISORY",
+      "title": "Removal of explicit no-context fallback changes LLM prompt structure",
+      "location": "src/graph/nodes.py, src/reanalysis/graph/nodes.py",
+      "description": "The old code passed 'Nenhum contexto adicional foi extraído.' when no YouTube context existed; the new code silently omits the context block. This changes the prompt seen by the LLM and may affect output quality for non-YouTube or state-miss scenarios.",
+      "suggestion": "Evaluate prompt quality with and without the phrase. Re-add as default if load-bearing."
+    },
+    {
+      "id": "CR-006",
+      "severity": "LOW",
+      "status": "ADVISORY",
+      "title": "Test assertions for truncation boundary not fully visible",
+      "location": "tests/test_youtube_agent.py",
+      "description": "The patch does not show all assertions in the new YouTubeFormattingTest. Coverage of exact line count (3), truncation length, bullet prefix, and empty-segments case cannot be confirmed.",
+      "suggestion": "Ensure assertions cover: 3-line cap, truncated line length ≤ 400 chars, '- ' prefix on each line, and empty-string result for 0 segments."
+    },
+    {
+      "id": "CR-007",
+      "severity": "INFO",
+      "status": "ADVISORY",
+      "title": "LangGraph state propagation for youtube_research_context not verified",
+      "location": "src/reanalysis/graph/state.py",
+      "description": "NotRequired fields without an explicit reducer may not propagate correctly in branched or resumed LangGraph executions. The .get() empty-string fallback is safe but the reducer strategy should be intentional.",
+      "suggestion": "Confirm no custom reducer is needed and document the empty-string fallback as intentional."
+    }
+  ],
+  "deduplication_notes": "CR-002 merged into CR-001 (same root: undocumented empty-segment handling). All remaining findings are distinct root causes.",
+  "verification": {
+    "ran": false,
+    "reason": "Risk level LOW, no CRITICAL or HIGH findings; verifier budget is 0."
+  },
+  "summary": "The PR correctly fixes the bug. The core logic of format_research_context is sound: the break placement is correct, the .get() fallback is safe, and the state field additions are consistent across both graph types. Advisory findings are minor: an untested edge case for all-empty segments, a Unicode ellipsis that may need confirming, a potential off-by-one in truncation intent, and a prompt-structure change from removing the old fallback string."
+}

@@ -12,17 +12,20 @@ customModes:
       - enforce agent budget
       - run applicable deterministic pre-scan once
       - load only selected specialist skills
-      - launch specialists in isolation
+      - launch selected specialists as isolated subagents
+      - keep the parent session in orchestrator mode
+      - persist specialist findings under reports/findings/
       - invoke finding-verifier only when justified
-      - run review-synthesis at the end
-      - write run metrics
+      - synthesize findings
+      - write final reports and run metrics
 
       Do not:
       - preload specialist skills
       - spawn unnecessary agents
+      - switch the parent session into specialist modes
       - run full test suites by default
       - modify production code
-      - push or publish changes
+      - commit, push, merge, or publish
     whenToUse: >
       Full PR review orchestration.
     groups:
@@ -47,14 +50,13 @@ customModes:
 
       Do not report style-only issues or execute tests/tools.
 
-      Output:
-      reports/findings/<pr-id>/code-review-specialist.json
+      Return canonical findings JSON to the orchestrator.
+      Do not write artifacts directly.
     whenToUse: >
       Behavioral or application logic changes.
     groups:
       - read
       - skill
-      - todo
 
   - slug: security-review-specialist
     name: Security Review Specialist
@@ -67,37 +69,13 @@ customModes:
       Trace attack paths and reuse existing deterministic evidence.
       Do not execute scanners.
 
-      Output:
-      reports/findings/<pr-id>/security-review-specialist.json
+      Return canonical findings JSON to the orchestrator.
+      Do not write artifacts directly.
     whenToUse: >
       Security, auth, tenant, input, crypto, or dependency-security triggers.
     groups:
       - read
       - skill
-      - todo
-
-  - slug: test-impact-specialist
-    name: Test Impact Specialist
-    description: >
-      Reviews high-risk behavioral changes for meaningful test coverage gaps.
-    roleDefinition: |
-      Map changed behavior to existing tests and identify important gaps.
-
-      Do not execute tests.
-      Temporary verification tests may be written only under:
-      reports/verification/<pr-id>/tests/
-
-      Output:
-      reports/findings/<pr-id>/test-impact-specialist.json
-    whenToUse: >
-      Complex or high-risk test impact requiring dedicated analysis.
-    groups:
-      - read
-      - edit
-      - skill
-      - todo
-    editRules:
-      - reports/verification/**
 
   - slug: architecture-review-specialist
     name: Architecture Review Specialist
@@ -109,14 +87,13 @@ customModes:
 
       Report only issues with concrete impact.
 
-      Output:
-      reports/findings/<pr-id>/architecture-review-specialist.json
+      Return canonical findings JSON to the orchestrator.
+      Do not write artifacts directly.
     whenToUse: >
       Structural, module-boundary, dependency-direction, or large refactor changes.
     groups:
       - read
       - skill
-      - todo
 
   - slug: database-review-specialist
     name: Database Review Specialist
@@ -128,14 +105,13 @@ customModes:
 
       Do not execute migrations or connect to databases.
 
-      Output:
-      reports/findings/<pr-id>/database-review-specialist.json
+      Return canonical findings JSON to the orchestrator.
+      Do not write artifacts directly.
     whenToUse: >
       Database, ORM, migration, query, index, transaction, or constraint changes.
     groups:
       - read
       - skill
-      - todo
 
   - slug: api-review-specialist
     name: API Review Specialist
@@ -145,14 +121,13 @@ customModes:
       Focus on routes, request/response schemas, breaking changes,
       HTTP semantics, OpenAPI, validation, and API authorization.
 
-      Output:
-      reports/findings/<pr-id>/api-review-specialist.json
+      Return canonical findings JSON to the orchestrator.
+      Do not write artifacts directly.
     whenToUse: >
       API, route, schema, HTTP, or OpenAPI changes.
     groups:
       - read
       - skill
-      - todo
 
   - slug: async-review-specialist
     name: Async Review Specialist
@@ -164,14 +139,13 @@ customModes:
 
       Do not execute tasks or send queue messages.
 
-      Output:
-      reports/findings/<pr-id>/async-review-specialist.json
+      Return canonical findings JSON to the orchestrator.
+      Do not write artifacts directly.
     whenToUse: >
       Queue, worker, task, consumer, or background-job changes.
     groups:
       - read
       - skill
-      - todo
 
   - slug: finding-verifier
     name: Finding Verifier
@@ -189,40 +163,14 @@ customModes:
 
       Do not create new findings or modify production code.
 
-      Output:
-      reports/verification/<pr-id>/verification-results.json
+      Write only verification artifacts under:
+      reports/verification/
     whenToUse: >
-      Batched verification of eligible CRITICAL/HIGH findings.
+      Batched verification of eligible CRITICAL/HIGH and selected MEDIUM findings.
     groups:
       - read
       - edit
       - execute
       - skill
-      - todo
     editRules:
       - reports/verification/**
-
-  - slug: review-synthesizer
-    name: Review Synthesizer
-    description: >
-      Consolidates findings and verification results into final reports.
-    roleDefinition: |
-      Remove REFUTED findings, deduplicate by root cause,
-      classify BLOCKING vs ADVISORY, calculate metrics, and write final reports.
-
-      Do not search for new bugs or re-run reviewers.
-
-      Outputs:
-      - reports/reviews/<pr-id>/review.json
-      - reports/reviews/<pr-id>/review.md
-      - reports/runs/<pr-id>/run-manifest.json
-    whenToUse: >
-      Only for complex/high-volume synthesis; normally synthesis runs inline.
-    groups:
-      - read
-      - edit
-      - skill
-      - todo
-    editRules:
-      - reports/reviews/**
-      - reports/runs/**

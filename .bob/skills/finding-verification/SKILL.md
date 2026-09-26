@@ -1,42 +1,44 @@
 ---
 name: finding-verification
 description: >
-  Verifies or refutes existing findings using targeted, reproducible evidence.
+  Verifies or refutes existing findings using targeted evidence.
 ---
 
 # Finding Verification
 
 ## Use When
 
-Run only for eligible findings, preferably in one batch:
+Verify only:
 
 - CRITICAL
 - HIGH
 - selected MEDIUM when evidence is weak
 
-Do not run for LOW/INFO by default.
+Do not verify LOW/INFO by default.
+
+Prefer one batched verification run.
 
 ## Rules
 
-- Verify only findings already reported.
-- Do not search for new bugs.
-- Reuse existing deterministic evidence.
-- Do not re-run tools unless necessary.
-- Use the minimum files and commands required.
+- verify only existing findings
+- do not search for new bugs
+- reuse existing evidence
+- use minimum files and commands
+- do not repeat deterministic checks unnecessarily
 
-## Verification
+## Verify
 
 For each finding:
 
-1. Restate the claim as a testable hypothesis.
-2. Prefer existing evidence first.
-3. If needed, choose one strategy:
+1. Convert the claim into a testable hypothesis.
+2. Reuse existing evidence first.
+3. If needed, use one method:
 
 `STATIC_ANALYSIS`, `TARGETED_TEST`, `INTEGRATION_TEST`,
 `CONFIG_INSPECTION`, `DEPENDENCY_ANALYSIS`,
 `CODE_PATH_PROOF`, `MANUAL_EVIDENCE`.
 
-4. Classify as:
+4. Set status:
 
 `VERIFIED`, `REFUTED`, `UNVERIFIED`,
 `NOT_APPLICABLE`, `VERIFICATION_FAILED`.
@@ -45,17 +47,17 @@ For each finding:
 
 `VERIFIED` and `REFUTED` require concrete evidence.
 
-When execution is required:
+When executing:
 
-- prefer targeted tests over full suites
+- prefer targeted tests
 - record command and exit code
-- create temporary tests only under:
+- write temporary tests only under:
 
 `reports/verification/<pr-id>/tests/`
 
-If a tool or environment fails, use `VERIFICATION_FAILED`.
+If execution or tooling fails, use `VERIFICATION_FAILED`.
 
-Do not mark REFUTED merely because proof was not found.
+Absence of proof is not evidence of refutation.
 
 ## Output
 
@@ -68,21 +70,21 @@ Each result must include:
 - `finding_id`
 - `status`
 - `method`
-- `command` if executed
-- `exit_code` if applicable
 - `evidence`
+- `command`, if executed
+- `exit_code`, if applicable
 - `notes`
 
 ## Must Not
 
 - create new findings
-- change finding severity
+- change severity
 - modify production code/config/migrations
-- add tests to official test directories
+- write tests outside `reports/verification/`
 - scan unrelated files
-- repeat existing deterministic checks unnecessarily
 - claim verification without evidence
+- re-run specialist reviewers
 
 ## Done When
 
-Every finding in the verification batch has a justified result and the verification file is written.
+Every finding in the batch has a justified status and the verification artifact was written.

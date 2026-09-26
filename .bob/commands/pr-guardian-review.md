@@ -21,19 +21,20 @@ Review a PR using minimum agents, minimum context, and lazy skill loading.
 ## Flow
 
 1. Validate PR input.
-2. Collect compact PR context.
-3. Load only `pr-triage`.
+2. Run `scripts/collect-pr-context.sh` once.
+3. Load `pr-triage`.
 4. Produce:
-   - `pr-context.json`
-   - `impact-map.json`
-   - `review-plan.json`
+   - `reports/context/<pr-id>/pr-context.json`
+   - `reports/context/<pr-id>/impact-map.json`
+   - `reports/plans/<pr-id>/review-plan.json`
 5. Respect `agent_budget`.
 6. Run applicable pre-scan tools once.
 7. Load only skills for `selected_reviewers`.
-8. Run selected specialists in isolation.
-9. If justified, invoke `finding-verifier` once with a batch.
-10. Run `review-synthesis`.
-11. Produce final reports.
+8. Run selected specialists as subagents.
+9. Persist returned findings under `reports/findings/<pr-id>/`.
+10. If justified, invoke `finding-verifier` once with a batch.
+11. Synthesize findings inline.
+12. Write final reports.
 
 ## Limits
 
@@ -41,20 +42,24 @@ Review a PR using minimum agents, minimum context, and lazy skill loading.
 - initial file reads: max 3
 - files per specialist: max 5
 - pre-scan tools: max 2
-- one verifier batch per run
+- verifier invocations: max 1
 
-Any expansion beyond limits requires explicit justification.
+Any expansion beyond limits requires a concrete risk or finding hypothesis.
 
 ## Rules
 
-- Never preload specialist skills.
-- Never spawn unselected reviewers.
-- Reviewers receive only relevant context.
-- Reviewers do not see other reviewers' findings.
-- Do not repeat deterministic checks.
+- Do not preload specialist skills.
+- Do not spawn unselected reviewers.
+- Run selected specialists as subagents.
+- Do not switch the parent session into specialist modes.
+- Specialists return findings to the orchestrator.
+- Specialists receive only relevant context.
+- Specialists do not receive other specialists' findings.
+- Reuse deterministic results.
+- Do not rediscover metadata already collected.
 - Do not run full test suites by default.
 - Do not modify production code.
-- Do not commit, push, or publish.
+- Do not commit, push, merge, or publish.
 
 ## Fast Path
 
@@ -64,42 +69,51 @@ Any expansion beyond limits requires explicit justification.
 
 ## Verification
 
-Load `finding-verification` only when:
+Invoke `finding-verifier` only when:
 
 - verifier budget > 0, and
-- eligible CRITICAL/HIGH findings exist
-- or selected uncertain MEDIUM findings justify low-cost verification
+- CRITICAL/HIGH findings exist
+- or selected uncertain MEDIUM findings justify verification
 
 Invoke at most once per run.
 
 ## Synthesis
 
-Load `review-synthesis` only after specialist/verification stages finish.
+The orchestrator:
 
-Write:
-
-- `reports/reviews/<pr-id>/review.json`
-- `reports/reviews/<pr-id>/review.md`
-- `reports/runs/<pr-id>/run-manifest.json`
+1. applies verification results
+2. removes `REFUTED` findings
+3. deduplicates by root cause
+4. classifies:
+   - `BLOCKING` = `VERIFIED` + `CRITICAL|HIGH`
+   - `ADVISORY` = remaining active findings
+5. writes:
+   - `reports/reviews/<pr-id>/review.json`
+   - `reports/reviews/<pr-id>/review.md`
+   - `reports/runs/<pr-id>/run-manifest.json`
 
 ## Abort
 
-Stop only when:
+Stop if:
 
-- PR input is invalid/unavailable, or
+- PR input is invalid/unavailable
+- discovery cannot provide minimum PR context
 - triage cannot produce `review-plan.json`
 
-Partial specialist failures are allowed and must be recorded.
+Partial specialist failures may continue, but must be recorded.
 
 ## Completion
 
-Show a short summary with:
+A run is successful only when:
 
-- risk level
-- selected reviewers
-- skills loaded
-- verification status
-- findings counts
-- final report paths
+- triage artifacts exist
+- all selected specialists returned findings
+- findings artifacts were persisted
+- verification completed or was explicitly skipped
+- `review.json` exists
+- `review.md` exists
+- `run-manifest.json` exists
 
-Then display `review.md`.
+Inline output does not replace required artifacts.
+
+Show a short summary and display `review.md`.

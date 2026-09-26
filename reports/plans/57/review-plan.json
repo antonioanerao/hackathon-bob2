@@ -1,0 +1,29 @@
+{
+  "pr_id": 57,
+  "risk_level": "MEDIUM",
+  "risk_triggers": [
+    "BACKGROUND_JOB_CHANGED",
+    "EXTERNAL_REQUEST_CHANGED"
+  ],
+  "agent_budget": {
+    "max_reviewers": 2,
+    "max_verifiers": 1
+  },
+  "rationale": "The PR changes a background job's execution order and query-building logic for a cross-service call (Qdrant vector search). The ordering shift (duplicate check moved post-workflow) is a semantic behavior change with potential for silent regressions when final_answer is None. The new abstraction layer is small and well-tested. No auth, schema, or API surface changes.",
+  "selected_reviewers": [
+    {
+      "id": "code-review-specialist",
+      "reason": "Logic change in job execution order and null-path handling in build_duplicate_check_query."
+    },
+    {
+      "id": "async-review-specialist",
+      "reason": "Duplicate-check call repositioned inside an RQ background job; ordering and failure-isolation implications."
+    }
+  ],
+  "skipped_reviewers": [
+    {"id": "security-review-specialist", "reason": "No auth/input/crypto surface changed."},
+    {"id": "database-review-specialist", "reason": "No schema or query changes."},
+    {"id": "api-review-specialist", "reason": "No route or API contract changed."},
+    {"id": "architecture-review-specialist", "reason": "Small contained module addition, no structural boundary change."}
+  ]
+}

@@ -1,0 +1,61 @@
+{
+  "specialist": "code-review-specialist",
+  "pr_id": 57,
+  "findings": [
+    {
+      "id": "CODE-001",
+      "severity": "HIGH",
+      "confidence": "HIGH",
+      "title": "Attachments hardcoded as [] — audio/video/image never checked for duplicates",
+      "description": "The PR title explicitly claims it adds duplicate-checking support for audio, video, and image attachments. However, in the new analyze.py the `run_duplicate_check` call always passes `[]` as the attachments list, discarding the actual `attachments` variable that was passed into `_process_analyze_job`. The old code passed `attachments or []`, meaning real attachment payloads were forwarded to the similarity engine. The new code never forwards them, so the media-type checking described in the PR title is never exercised — this is a functional regression for attachment-based duplicate detection.",
+      "file": "src/jobs/analyze.py",
+      "line_hint": "run_duplicate_check(build_duplicate_check_query(final_answer), [], ...)",
+      "recommendation": "Pass the actual `attachments` variable (or its normalized equivalent `normalized_attachments`) instead of `[]`. If attachment-based checking is intentionally deferred, the PR title and description must be corrected and a follow-up ticket filed.",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "CODE-002",
+      "severity": "HIGH",
+      "confidence": "HIGH",
+      "title": "run_duplicate_check called with None query when workflow produces no final_answer",
+      "description": "When `final_answer` is `None` (workflow failure or no answer), `build_duplicate_check_query` returns `None`, and `run_duplicate_check(None, [], ...)` is still called unconditionally. The behavior of `check_duplicate_analysis(None, [])` is not modified in this PR and is undefined from the diff context. This may error, return a misleading 'no duplicate' result, or trigger unexpected retry logic.",
+      "file": "src/jobs/analyze.py",
+      "line_hint": "run_duplicate_check(build_duplicate_check_query(final_answer), [], ...)",
+      "recommendation": "Guard the duplicate-check call: if `build_duplicate_check_query(final_answer)` returns `None`, skip the call and set `duplicate_check_data` to a 'skipped' sentinel.",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "CODE-003",
+      "severity": "MEDIUM",
+      "confidence": "HIGH",
+      "title": "Ordering change: LLM workflow always runs even for known duplicates — wasted compute",
+      "description": "Previously, duplicate checking ran before the workflow as an early-exit gate. Now the workflow always runs first and the duplicate check follows, meaning all LLM/workflow compute is incurred even when the submission is a known duplicate. The retry_attempt counter is consumed by the workflow before the duplicate check can short-circuit. This is a semantic regression in cost and throughput for the duplicate-submission path.",
+      "file": "src/jobs/analyze.py",
+      "line_hint": "normalize_attachments → workflow.stream() → run_duplicate_check",
+      "recommendation": "Clarify whether the goal is post-hoc deduplication only. If early-exit is desired for cost savings, keep a pre-workflow check and add a post-workflow title-based check. If post-hoc only, explicitly document the trade-off.",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "CODE-004",
+      "severity": "MEDIUM",
+      "confidence": "HIGH",
+      "title": "build_duplicate_check_query returns None for whitespace-only/prefix-only titles with no observable signal",
+      "description": "If `final_answer.title` is empty or becomes empty after prefix stripping (e.g. a title that is only a classification prefix like 'FALSO:'), `normalized_title` is falsy and the function returns `None`. This silently skips the duplicate check with no log, metric, or error. The caller in `analyze.py` does not distinguish this case from `final_answer is None`.",
+      "file": "src/similarity/query.py",
+      "line_hint": "return normalized_title or None",
+      "recommendation": "Log or emit a metric when a non-None `final_answer` produces a `None` query, so pathological titles that bypass duplicate checking are observable in production.",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "CODE-005",
+      "severity": "LOW",
+      "confidence": "HIGH",
+      "title": "None-query downstream path not tested in integration",
+      "description": "Tests verify `build_duplicate_check_query` in isolation but do not test what happens when the returned `None` is passed to `run_duplicate_check`. If `check_duplicate_analysis(None, [])` raises or returns an incorrect result, no test will catch it.",
+      "file": "tests/test_similarity_query.py",
+      "line_hint": "all 3 tests",
+      "recommendation": "Add an integration-level or mock-based test in `test_similarity_worker.py` verifying behavior when `final_answer` is `None`.",
+      "verification_status": "UNVERIFIED"
+    }
+  ]
+}

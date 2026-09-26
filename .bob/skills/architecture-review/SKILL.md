@@ -8,10 +8,10 @@ description: >
 
 ## Use When
 
-Activate only for:
+Activate for:
 
 - module/layer boundary changes
-- new cross-module dependencies
+- cross-module dependency changes
 - circular dependency risk
 - responsibility movement
 - dependency direction changes
@@ -24,52 +24,48 @@ Review changed code for:
 - low cohesion
 - circular dependencies
 - boundary violations
-- high-level code depending directly on low-level implementation
+- wrong dependency direction
+- responsibility misalignment
 
-Only report issues with concrete impact, such as:
-
-- harder testing
-- import/startup failure risk
-- unnecessary deployment coupling
-- unrelated modules changing together
-- broken architectural boundary
+Report only issues with concrete practical impact.
 
 ## Evidence
 
 Each finding must include:
 
 - changed file/line
-- concrete import/dependency evidence
+- import/dependency evidence
 - practical impact
+- actionable recommendation
 
-Do not report theoretical pattern/SOLID preferences.
+Do not report theoretical pattern or SOLID preferences without a concrete defect.
+
+Do not emit speculative findings when one targeted read can confirm or refute them.
 
 ## Output
 
-Write:
-
-`reports/findings/<pr-id>/architecture-review-specialist.json`
+Return findings as canonical JSON to the orchestrator.
 
 Finding IDs:
 
 `ARCH-001`, `ARCH-002`, ...
 
-Use the canonical finding schema.
+Set:
 
-Categories:
+`verification_status: UNVERIFIED`
 
-`COUPLING`, `COHESION`, `CIRCULAR_DEPENDENCY`,
-`BOUNDARY_VIOLATION`, `DEPENDENCY_INVERSION`,
-`RESPONSIBILITY_MISALIGNMENT`.
+The orchestrator persists:
+
+`reports/findings/<pr-id>/architecture-review-specialist.json`
 
 ## Must Not
 
-- execute code/tests
+- execute code or tests
 - scan unrelated files
-- invent architecture or dependency cycles
+- invent dependency relationships
 - report pre-existing issues as introduced
 - recommend broad rewrites
 
 ## Done When
 
-All structural changes in scope were reviewed and evidence-backed findings were written.
+All relevant structural changes were reviewed and evidence-backed findings were returned to the orchestrator.

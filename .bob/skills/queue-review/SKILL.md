@@ -1,7 +1,7 @@
 ---
 name: queue-review
 description: >
-  Reviews async/queue changes for reliability risks.
+  Reviews async and queue changes for concrete reliability risks.
 ---
 
 # Queue Review
@@ -11,7 +11,7 @@ description: >
 Activate for:
 
 - queues/workers/tasks/consumers
-- retry logic
+- retries
 - background jobs
 - Celery, RQ, RabbitMQ, Kafka
 
@@ -20,15 +20,15 @@ Activate for:
 Review changed async code for:
 
 - missing idempotency
-- unsafe retries or infinite retry loops
-- duplicate delivery risk
-- wrong ack/commit timing
-- missing poison-message/DLQ handling
+- unsafe or infinite retries
+- duplicate delivery
+- incorrect ack/commit timing
+- missing DLQ/poison handling
 - ordering assumptions
 - partial failure between side effects
-- timeout/serialization issues
+- timeout or serialization issues
 
-Focus on the full lifecycle:
+Consider the lifecycle:
 
 `enqueue → process → retry/fail → final handling`
 
@@ -37,42 +37,41 @@ Focus on the full lifecycle:
 Each finding must include:
 
 - changed file/line
-- concrete task/worker/config evidence
+- concrete worker/task/config evidence
 - practical impact
 - actionable recommendation
 
-If runtime proof is required, leave:
+Do not invent runtime behavior, delivery guarantees, or metrics.
 
-`verification_status: UNVERIFIED`
-
-for `finding-verifier`.
+Do not emit speculative findings when one targeted read can confirm or refute them.
 
 ## Output
 
-Write:
-
-`reports/findings/<pr-id>/async-review-specialist.json`
+Return findings as canonical JSON to the orchestrator.
 
 Finding IDs:
 
 `ASYNC-001`, `ASYNC-002`, ...
 
-Use the canonical finding schema.
+Set:
 
-Categories:
+`verification_status: UNVERIFIED`
 
-`IDEMPOTENCY`, `RETRY_LOOP`, `MISSING_DLQ`, `ACKNOWLEDGMENT`,
-`POISON_MESSAGE`, `ORDERING`, `PARTIAL_FAILURE`,
-`DUPLICATE_DELIVERY`, `TIMEOUT`, `SERIALIZATION`.
+The orchestrator persists:
+
+`reports/findings/<pr-id>/async-review-specialist.json`
+
+If no concrete defects exist, return an empty findings list.
 
 ## Must Not
 
 - execute tasks
-- send messages to queues
-- modify worker/queue config
+- send queue messages
+- modify queue/worker configuration
 - scan unrelated async code
-- invent runtime behavior or queue metrics
+- invent runtime behavior or metrics
+- report pre-existing issues as introduced
 
 ## Done When
 
-All changed async processing in scope was reviewed and evidence-backed findings were written.
+All relevant async changes were reviewed and evidence-backed findings were returned to the orchestrator.

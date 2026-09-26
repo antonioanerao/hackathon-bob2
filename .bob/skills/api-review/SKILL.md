@@ -1,175 +1,78 @@
 ---
 name: api-review
 description: >
-  Reviews API changes for contract breakage, HTTP semantics, OpenAPI alignment,
-  input validation, and API-level authorization.
+  Reviews API changes for concrete contract, validation, and authorization risks.
 ---
 
 # API Review
 
-## Purpose
+## Use When
 
-Detect API changes that may break consumers, weaken authorization, or diverge from documented contracts.
+Activate for:
 
-Core question:
+- route or endpoint changes
+- request/response schema changes
+- OpenAPI changes
+- HTTP status changes
+- API authorization changes
+- public API contract changes
 
-> Does this PR introduce a breaking or unsafe API contract change?
+## Check
 
-## When to Use
+Review changed API code for:
 
-Activate only when one or more apply:
+- breaking contract changes
+- request/response incompatibility
+- incorrect HTTP semantics
+- OpenAPI mismatch
+- missing validation
+- API auth/authz issues
 
-- `API`
-- `REST`
-- `GRPC`
-- `ROUTE`
-- `OPENAPI`
-- `REQUEST_SCHEMA`
-- `RESPONSE_SCHEMA`
-- `HTTP_STATUS`
-- `API_AUTHORIZATION`
-- `PUBLIC_API_CHANGED`
+Breaking examples:
 
-## Inputs
+- removed or renamed endpoint/field
+- changed HTTP method
+- changed field type
+- new required field/parameter
+- changed authentication requirement
 
-- PR context
-- impact map, if available
-- review plan
-- changed route/controller/handler files
-- changed request/response schema files
-- OpenAPI/Swagger files, if relevant
+## Evidence
 
-Read only the minimum files required.
+Each finding must include:
 
-Do not execute tests or scanners.
+- changed file/line
+- affected route/schema
+- concrete before/after evidence when applicable
+- practical impact
+- actionable recommendation
 
-## Analysis
-
-### 1. Contract Changes
-
-Inspect changed routes and schemas for:
-
-- endpoint removed or renamed
-- HTTP method changed
-- required request field added
-- optional field made required
-- response field removed or renamed
-- field type changed
-- query/path parameter semantics changed
-- authentication requirement changed
-- response status/schema changed
-
-Treat additive changes as usually non-breaking:
-
-- new endpoint
-- new optional field
-- new optional query parameter
-- new response field
-
-### 2. HTTP Semantics
-
-Check whether changed endpoints use appropriate status codes.
-
-Focus especially on:
-
-- creation
-- validation errors
-- authentication failures
-- authorization failures
-- missing resources
-- conflicts
-- unexpected server errors
-
-Do not report stylistic HTTP preferences unless behavior or compatibility is affected.
-
-### 3. OpenAPI Alignment
-
-If an OpenAPI/Swagger definition exists, verify changed endpoints against it:
-
-- route documented
-- request schema aligned
-- response schema aligned
-- status codes aligned
-
-If no specification exists, review implementation only.
-
-### 4. Authorization
-
-For affected endpoints, verify statically:
-
-- authentication exists where required
-- authorization is enforced where required
-- permission checks occur before sensitive access
-- admin/internal endpoints remain protected
-
-Do not duplicate deep security analysis already assigned to `security-review-specialist`.
-
-### 5. Input Validation
-
-Check affected API inputs for:
-
-- required fields
-- type validation
-- constraints/ranges
-- trust-boundary validation
-
-Only report issues introduced or exposed by the PR.
-
-## Severity Guidance
-
-- `CRITICAL`: auth bypass or major security exposure
-- `HIGH`: breaks valid existing clients or critical contract
-- `MEDIUM`: behavioral incompatibility with limited scope
-- `LOW`: minor concrete compatibility issue
-- `INFO`: objective non-blocking observation
+Do not emit speculative findings when one targeted read can confirm or refute them.
 
 ## Output
 
-Write:
-
-`reports/findings/<pr-id>/api-review-specialist.json`
+Return findings as canonical JSON to the orchestrator.
 
 Finding IDs:
 
 `API-001`, `API-002`, ...
 
-Use the project canonical finding schema.
+Set:
 
-Recommended categories:
+`verification_status: UNVERIFIED`
 
-- `BREAKING_CHANGE`
-- `HTTP_SEMANTICS`
-- `OPENAPI_MISMATCH`
-- `MISSING_AUTHORIZATION`
-- `MISSING_VALIDATION`
-- `VERSIONING`
-- `BACKWARD_INCOMPATIBLE`
+The orchestrator persists:
 
-Each finding must include:
-
-- concrete changed file/line
-- before/after evidence when applicable
-- affected route
-- impact
-- actionable recommendation
-- `verification_status: UNVERIFIED`
+`reports/findings/<pr-id>/api-review-specialist.json`
 
 ## Must Not
 
-- modify source or API specifications
+- modify source/specs
 - execute tests or tools
 - scan unrelated API code
-- fabricate client/consumer impact
-- report breaking changes without concrete before/after evidence
-- duplicate findings already covered by another specialist unless the API-specific impact is distinct
+- invent consumer impact
+- report breaking changes without concrete evidence
+- duplicate another specialist finding unless API impact is distinct
 
-## Completion Criteria
+## Done When
 
-Complete when:
-
-- all changed API contracts in scope were reviewed
-- breaking changes were identified
-- HTTP semantics were checked
-- OpenAPI alignment was checked when applicable
-- API authorization and validation were evaluated
-- findings were written using the canonical schema
+All relevant changed API contracts were reviewed and evidence-backed findings were returned to the orchestrator.

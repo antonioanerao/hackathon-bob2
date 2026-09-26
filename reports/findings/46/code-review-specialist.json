@@ -1,0 +1,58 @@
+[
+  {
+    "id": "CR-001",
+    "severity": "MEDIUM",
+    "title": "Empty-relevance segments silently skipped — no test coverage for all-empty case",
+    "location": "src/agents/youtube_agent/formatting.py",
+    "description": "The loop filters out segments whose _compact_summary returns a falsy string. If all segments have empty relevance, format_research_context returns an empty string. This is handled gracefully downstream (the if relevant_context.strip() guard in format_youtube_research_query will omit the context block), so there is no crash. However, the silent empty-string return is not tested and could mask data-quality issues in production without any warning.",
+    "suggestion": "Add a test case for all-empty relevance strings to document the intended behaviour. Optionally log a warning when no summaries are collected."
+  },
+  {
+    "id": "CR-002",
+    "severity": "LOW",
+    "title": "break placement is correct but empty-segment skip behaviour is undocumented",
+    "location": "src/agents/youtube_agent/formatting.py",
+    "description": "The break fires only after a non-empty summary is appended and the list has reached MAX_RESEARCH_CONTEXT_SEGMENTS. Empty-relevance segments do not consume a slot. The behaviour is correct but should be documented in a comment.",
+    "suggestion": "Add a comment clarifying that empty segments do not count toward the cap."
+  },
+  {
+    "id": "CR-003",
+    "severity": "LOW",
+    "title": "Ellipsis character (U+2026) used in truncation — potential encoding issue",
+    "location": "src/agents/youtube_agent/formatting.py",
+    "description": "_compact_summary appends the Unicode character \u2026 (U+2026) when truncating. If any downstream consumer expects pure ASCII or a specific encoding, this may cause a UnicodeEncodeError or render incorrectly.",
+    "suggestion": "Use '...' (three ASCII full stops) instead of '\u2026', or confirm the full pipeline handles UTF-8 throughout."
+  },
+  {
+    "id": "CR-004",
+    "severity": "LOW",
+    "title": "Off-by-one in truncation: slice caps at 399 chars, not 400",
+    "location": "src/agents/youtube_agent/formatting.py",
+    "description": "The slice summary[:MAX_RESEARCH_SUMMARY_CHARS - 1] takes the first 399 characters before appending \u2026, yielding a 400-character total. If 400 chars was intended to mean content length (not total including ellipsis), this is one character short.",
+    "suggestion": "Clarify intent: if the cap means total length including \u2026, current code is correct. If it means 400 chars of content + \u2026, change to summary[:MAX_RESEARCH_SUMMARY_CHARS].rstrip() + '\u2026'. Update the constant comment to match."
+  },
+  {
+    "id": "CR-005",
+    "severity": "LOW",
+    "title": "Removed fallback string changes LLM prompt structure silently",
+    "location": "src/graph/nodes.py, src/reanalysis/graph/nodes.py",
+    "description": "The old code fell back to 'Nenhum contexto adicional foi extraído.' when no YouTube context existed, providing an explicit signal to the LLM. The new code passes empty string and the guard silently omits the context block. For flows where youtube_research_context is absent from state, the omission is silent and the prompt is shorter. This is a behavioural change in prompt content that may affect model output quality.",
+    "suggestion": "Evaluate whether the LLM performs better with or without the explicit no-context phrase. If the old phrase was load-bearing for prompt reliability, consider re-adding it as a default."
+  },
+  {
+    "id": "CR-006",
+    "severity": "LOW",
+    "title": "Test assertions for format_research_context truncation boundary are unconfirmed",
+    "location": "tests/test_youtube_agent.py",
+    "description": "The truncation boundary (exactly 400 chars, presence of ellipsis, correct rstrip behaviour) and the cap at 3 segments are the most important correctness properties of the new code. Without full assertion visibility it cannot be confirmed they cover the off-by-one in CR-004 or the bullet-list format.",
+    "suggestion": "Ensure tests assert: (1) exactly 3 lines returned when 4 segments are given, (2) each truncated line is <= 400 chars including ellipsis, (3) each line starts with '- ', and (4) result for 0 segments is empty string."
+  },
+  {
+    "id": "CR-007",
+    "severity": "INFO",
+    "title": "youtube_research_context LangGraph state propagation not verified",
+    "location": "src/reanalysis/graph/state.py",
+    "description": "The field is declared as NotRequired[str] in both RouterState and ReanalysisState. If the reanalysis graph reconstructs state from a serialised checkpoint predating this PR, the field will be absent and .get() returns ''. Verify that LangGraph's reducer strategy for this field is intentional.",
+    "suggestion": "Confirm that no custom reducer is needed for youtube_research_context and that the empty-string fallback is the desired behaviour for replayed or resumed graphs."
+  }
+]

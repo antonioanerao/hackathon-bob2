@@ -1,0 +1,54 @@
+{
+  "pr_id": 57,
+  "repository": "mp-ac/verifica-ai",
+  "title": "feat: adicionado verificacao de duplicidade também para áudio, vídeo e imagem",
+  "base_sha": "1cd7022b4481a65b86abf3cdefd18fa97cc24a26",
+  "head_sha": "92f5a235c1f100e04e85a2d60ab36539f5755064",
+  "additions": 104,
+  "deletions": 11,
+  "changed_files_count": 5,
+  "language": "Python",
+  "intent": "Extends the duplicate-check feature so it also considers audio, video, and image attachments. A new `build_duplicate_check_query` function extracts a normalized title from the workflow's `FinalAnswerResult` rather than passing the raw query string. The call site in `analyze.py` is moved after the workflow run so the final answer is available when the check executes.",
+  "changed_files": [
+    {
+      "path": "src/jobs/analyze.py",
+      "status": "modified",
+      "additions": 8,
+      "deletions": 7,
+      "summary": "Moves duplicate-check call to after workflow completion; replaces raw `query` arg with `build_duplicate_check_query(final_answer)`; passes empty attachments list."
+    },
+    {
+      "path": "src/similarity/query.py",
+      "status": "added",
+      "additions": 13,
+      "deletions": 0,
+      "summary": "New module: `build_duplicate_check_query` strips classification prefix from `final_answer.title` to produce the normalized search query."
+    },
+    {
+      "path": "tests/test_qdrant_queue.py",
+      "status": "modified",
+      "additions": 6,
+      "deletions": 0,
+      "summary": "Adds test coverage for the queue path."
+    },
+    {
+      "path": "tests/test_similarity_query.py",
+      "status": "added",
+      "additions": 34,
+      "deletions": 0,
+      "summary": "Unit tests for `build_duplicate_check_query`: title stripping, None guard, verdict-only title."
+    },
+    {
+      "path": "tests/test_similarity_worker.py",
+      "status": "modified",
+      "additions": 43,
+      "deletions": 4,
+      "summary": "Updates worker tests to reflect new call ordering and query-building logic."
+    }
+  ],
+  "risk_triggers": [
+    "BACKGROUND_JOB_CHANGED",
+    "EXTERNAL_REQUEST_CHANGED"
+  ],
+  "collection_method": "github_api + raw content fetch"
+}

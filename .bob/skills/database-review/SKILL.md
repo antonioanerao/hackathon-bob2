@@ -1,8 +1,7 @@
 ---
 name: database-review
 description: >
-  Reviews database changes for concrete risks to integrity, availability,
-  performance, and deploy safety.
+  Reviews database changes for integrity, availability, performance, and deploy risks.
 ---
 
 # Database Review
@@ -11,8 +10,8 @@ description: >
 
 Activate for:
 
-- migrations or schema changes
-- model/ORM changes
+- migrations/schema changes
+- ORM/model changes
 - query changes
 - transactions
 - indexes/constraints/foreign keys
@@ -22,14 +21,14 @@ Activate for:
 Review changed persistence code for:
 
 - unsafe or irreversible migrations
-- `NOT NULL`/constraint changes that can fail on existing data
+- `NOT NULL`/constraint failures on existing data
 - data loss or incompatible type changes
 - locking/downtime risk
 - missing or harmful indexes
 - N+1 or unbounded queries
-- unsafe SQL construction
+- unsafe SQL
 - transaction/rollback issues
-- broken referential integrity
+- referential integrity problems
 
 ## Evidence
 
@@ -39,36 +38,34 @@ Each finding must include:
 - concrete migration/query/schema evidence
 - affected table/model when known
 - practical impact
+- actionable recommendation
 
-Do not invent table sizes, EXPLAIN results, or production behavior.
+Do not invent production data, query plans, or runtime behavior.
+
+Do not emit speculative findings when one targeted read can confirm or refute them.
 
 ## Output
 
-Write:
-
-`reports/findings/<pr-id>/database-review-specialist.json`
+Return findings as canonical JSON to the orchestrator.
 
 Finding IDs:
 
 `DB-001`, `DB-002`, ...
 
-Use the canonical finding schema.
-
-Categories:
-
-`MIGRATION_LOCK`, `IRREVERSIBLE_MIGRATION`, `NULL_SAFETY`,
-`DATA_LOSS`, `N_PLUS_ONE`, `INDEX_MISSING`, `INDEX_LOCK`,
-`TRANSACTION_BOUNDARY`, `CONSTRAINT_VIOLATION`,
-`REFERENTIAL_INTEGRITY`, `QUERY_INJECTION`.
-
 Set:
 
 `verification_status: UNVERIFIED`
 
+The orchestrator persists:
+
+`reports/findings/<pr-id>/database-review-specialist.json`
+
+If no concrete defects exist, return an empty findings list.
+
 ## Must Not
 
 - execute migrations
-- connect to or modify databases
+- connect to databases
 - run application code
 - scan unrelated persistence code
 - fabricate metrics or query plans
@@ -76,4 +73,4 @@ Set:
 
 ## Done When
 
-All changed database-related code in scope was reviewed and evidence-backed findings were written.
+All relevant database changes were reviewed and evidence-backed findings were returned to the orchestrator.

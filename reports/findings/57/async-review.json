@@ -1,0 +1,61 @@
+{
+  "specialist": "async-review-specialist",
+  "pr_id": 57,
+  "findings": [
+    {
+      "id": "ASYNC-001",
+      "severity": "HIGH",
+      "confidence": "HIGH",
+      "title": "Persist-before-duplicate-check creates double-persist on retry",
+      "description": "`dispatch_completed_result(persist_to_qdrant=...)` is called BEFORE `run_duplicate_check`. If the job crashes or is killed after `dispatch_completed_result` but before returning, RQ's retry mechanism re-runs the entire `_process_analyze_job` from the top. On retry the LLM workflow executes again, `dispatch_completed_result` fires again, and the same result is written to Qdrant a second time with no idempotency guard visible in the provided code. The duplicate check that was meant to prevent duplicates has not yet run, so it cannot protect against this. The old ordering (duplicate check FIRST) did not have this window.",
+      "file": "src/jobs/analyze.py",
+      "line_hint": "dispatch_completed_result call before run_duplicate_check",
+      "recommendation": "Either (1) make `dispatch_completed_result` idempotent by keying on `task_id`, or (2) move `dispatch_completed_result` after the duplicate check so both succeed before job completion, or (3) persist only on the final retry attempt.",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "ASYNC-002",
+      "severity": "HIGH",
+      "confidence": "MEDIUM",
+      "title": "Exception in run_duplicate_check after Qdrant persist fails the job and triggers retry",
+      "description": "If an exception escapes `run_duplicate_check`'s internal guard (e.g. a bug in `build_duplicate_check_query`, a serialization error, or an error in `.to_summary().model_dump()`), it propagates uncaught into `_process_analyze_job`. At that moment `dispatch_completed_result` has already committed to Qdrant. The job is marked failed by RQ, triggering a retry that re-runs the LLM workflow, resulting in an orphaned Qdrant record and duplicate work.",
+      "file": "src/jobs/analyze.py",
+      "line_hint": "duplicate_check = run_duplicate_check(...); duplicate_check_data = duplicate_check.to_summary().model_dump()",
+      "recommendation": "Wrap the `run_duplicate_check` call and `.to_summary().model_dump()` in a try/except that logs the error and falls back to a sentinel `{'outcome': 'unavailable'}` so a failure here never causes job failure after the Qdrant persist.",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "ASYNC-003",
+      "severity": "MEDIUM",
+      "confidence": "HIGH",
+      "title": "Duplicate check appended to job end extends total execution time, increasing timeout risk",
+      "description": "In the old ordering, the duplicate check ran before the workflow, so its latency was paid upfront. In the new ordering, total job wall-clock time = LLM workflow time + duplicate check network round-trip. If the RQ job timeout is set close to the expected LLM workflow duration, the additional tail latency may push execution over the limit, causing `SIGKILL`. This would leave the Qdrant persist committed with no job completion record and trigger a retry (ASYNC-001 applies).",
+      "file": "src/jobs/analyze.py",
+      "line_hint": "run_duplicate_check(...) — last substantive call before return",
+      "recommendation": "Audit the RQ `job_timeout` against p95 latency of (LLM workflow + duplicate check). Increase timeout or move the duplicate check to a separate lightweight follow-up job if the margin is thin.",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "ASYNC-004",
+      "severity": "MEDIUM",
+      "confidence": "HIGH",
+      "title": "Empty attachments list bypasses attachment-based deduplication in similarity layer",
+      "description": "The old call forwarded actual attachments `(attachments or [])`. The new call hardcodes `[]`. If the similarity backend used attachment bytes or metadata for comparison, that signal is now lost — the duplicate check operates only on the derived text query. The PR's stated goal of adding attachment-type duplicate detection is not structurally achieved.",
+      "file": "src/jobs/analyze.py",
+      "line_hint": "run_duplicate_check(build_duplicate_check_query(final_answer), [], ...)",
+      "recommendation": "Pass `normalized_attachments` alongside the derived query to preserve attachment signals in the similarity check.",
+      "verification_status": "UNVERIFIED"
+    },
+    {
+      "id": "ASYNC-005",
+      "severity": "LOW",
+      "confidence": "HIGH",
+      "title": "Duplicate check result does not gate Qdrant persistence — advisory outcome never consulted",
+      "description": "`dispatch_completed_result(persist_to_qdrant=not human_response_required)` is called unconditionally before the duplicate check result is known. The duplicate check outcome therefore has no effect on whether the result is persisted. The advisory result is computed but never consulted for the persist decision.",
+      "file": "src/jobs/analyze.py",
+      "line_hint": "dispatch_completed_result call preceding run_duplicate_check",
+      "recommendation": "If the product intent is to suppress Qdrant persistence for detected duplicates, move `dispatch_completed_result` after `run_duplicate_check` and gate `persist_to_qdrant` on `duplicate_check.outcome != 'duplicate'`. If advisory-only is intentional, document this explicitly.",
+      "verification_status": "UNVERIFIED"
+    }
+  ]
+}

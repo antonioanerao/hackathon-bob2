@@ -1,0 +1,23 @@
+{
+  "pr_id": 46,
+  "changed_symbols": [
+    "format_research_context (new function in formatting.py)",
+    "_compact_summary (new private helper in formatting.py)",
+    "query_youtube (agent.py) — adds youtube_research_context to output dict",
+    "prepare_search_query (graph/nodes.py) — switches from media_contexts lookup to state.youtube_research_context",
+    "format_reanalysis_research_query (reanalysis/graph/nodes.py) — same switch",
+    "format_youtube_research_query (graph/youtube.py) — relevant_context now has default empty string, conditional inclusion",
+    "RouterState (graph/state.py) — new NotRequired field youtube_research_context",
+    "ReanalysisState (reanalysis/graph/state.py) — new NotRequired field youtube_research_context"
+  ],
+  "direct_callers": [
+    "prepare_search_query reads youtube_research_context from RouterState",
+    "format_reanalysis_research_query reads youtube_research_context from ReanalysisState"
+  ],
+  "exposed_routes": [],
+  "related_tests": [
+    "tests/test_youtube_agent.py — new YouTubeFormattingTest",
+    "tests/test_reanalysis.py — updated test_reanalysis_uses_only_central_youtube_claim"
+  ],
+  "risk_notes": "media_contexts is no longer consumed for YouTube context in both graph paths; old fallback string 'Nenhum contexto adicional foi extraído.' is removed. If youtube_research_context is absent from state the field defaults to empty string via .get(), which is safe."
+}

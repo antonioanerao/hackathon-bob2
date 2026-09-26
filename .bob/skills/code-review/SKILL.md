@@ -8,73 +8,85 @@ description: >
 
 ## Use When
 
-Activate for behavioral changes such as:
+Activate for behavioral changes involving:
 
 - application logic
-- concurrency
 - error handling
-- state changes
+- state
+- concurrency
 
 ## Check
 
-Review changed functions in context for:
+Review changed code for:
 
 - logic errors
-- missing/error paths
+- error paths
 - null/None handling
 - inconsistent state
 - resource leaks
 - race conditions
-- async/await mistakes
+- async/await issues
 - edge cases
-- regressions affecting callers
+- regressions
 
-Use the impact map and existing pre-scan results when available.
+Use existing impact and pre-scan context.
 
-Do not re-run linters or tests.
+## Confirm Findings
+
+Before emitting a finding, perform one targeted read when it can directly confirm or refute the hypothesis.
+
+Emit a finding only when the PR introduces or exposes a concrete current defect or regression.
+
+Do not emit findings for:
+
+- style or readability
+- hypothetical future misuse
+- defensive improvements
+- missing tests without concrete behavioral risk
+- behavior that is currently correct
 
 ## Evidence
 
 Each finding must include:
 
 - changed file/line
-- concrete code evidence
+- concrete evidence
+- reachable behavior
 - practical impact
 - actionable recommendation
 
-If runtime proof is needed, add a verification recommendation for `finding-verifier`.
+If runtime proof is required, keep:
+
+`verification_status: UNVERIFIED`
+
+for `finding-verifier`.
 
 ## Output
 
-Write:
-
-`reports/findings/<pr-id>/code-review-specialist.json`
+Return findings as canonical JSON to the orchestrator.
 
 Finding IDs:
 
 `CODE-001`, `CODE-002`, ...
 
-Use the canonical finding schema.
-
-Categories:
-
-`LOGIC_ERROR`, `ERROR_HANDLING`, `NULL_DEREFERENCE`,
-`STATE_CONSISTENCY`, `RESOURCE_LEAK`, `RACE_CONDITION`,
-`EDGE_CASE`, `REGRESSION`.
-
 Set:
 
 `verification_status: UNVERIFIED`
 
+The orchestrator persists:
+
+`reports/findings/<pr-id>/code-review-specialist.json`
+
+If no concrete defects exist, return an empty findings list.
+
 ## Must Not
 
 - execute tests or tools
-- report style issues
 - scan unrelated code
-- report pre-existing issues as introduced
 - invent evidence
-- analyze only diff lines when full function context is needed
+- report pre-existing issues as introduced
+- report speculative findings
 
 ## Done When
 
-All changed behavioral code in scope was reviewed and evidence-backed findings were written.
+All relevant changed behavior was reviewed and evidence-backed findings were returned to the orchestrator.

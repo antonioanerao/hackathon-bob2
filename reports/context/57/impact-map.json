@@ -1,0 +1,36 @@
+{
+  "pr_id": 57,
+  "changed_symbols": [
+    "similarity.query.build_duplicate_check_query",
+    "jobs.analyze._process_analyze_job"
+  ],
+  "direct_callers": [
+    {
+      "symbol": "jobs.analyze._process_analyze_job",
+      "calls": ["similarity.check.run_duplicate_check", "similarity.query.build_duplicate_check_query"]
+    }
+  ],
+  "behavior_changes": [
+    {
+      "file": "src/jobs/analyze.py",
+      "change": "Duplicate check now executes AFTER the workflow run; previously it ran BEFORE. The query is now derived from final_answer.title instead of raw query.",
+      "impact": "If final_answer is None (workflow fails or returns no answer), build_duplicate_check_query returns None and the duplicate check runs with a null query. Ordering change means duplicate check no longer blocks or precedes the LLM workflow."
+    },
+    {
+      "file": "src/similarity/query.py",
+      "change": "New function: normalizes title by stripping classification prefix.",
+      "impact": "Duplicate matching is now based on the normalized claim title rather than the original user query, which is semantically more accurate for media content."
+    }
+  ],
+  "related_tests": [
+    "tests/test_similarity_query.py",
+    "tests/test_similarity_worker.py",
+    "tests/test_qdrant_queue.py"
+  ],
+  "unaffected_paths": [
+    "similarity.check.run_duplicate_check",
+    "similarity.service.check_duplicate_analysis",
+    "graph.workflow",
+    "jobs.result_dispatch"
+  ]
+}

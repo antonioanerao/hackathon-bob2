@@ -1,19 +1,19 @@
 ---
 name: pr-triage
 description: >
-  Single-pass PR triage for context, impact, risk, and reviewer routing.
+  Single-pass PR triage for context, risk, and reviewer routing.
 ---
 
 # PR Triage
 
 ## Goal
 
-Answer in one pass:
+Determine:
 
-- What changed?
-- What can it affect?
-- How risky is it?
-- Which reviewers are needed?
+- what changed
+- what may be affected
+- risk level
+- required reviewers
 
 Principles:
 
@@ -24,31 +24,30 @@ Principles:
 
 Before routing:
 
-- max discovery commands: 2
-- max initial file reads: 3
-- max skill loads: 1
-- max discovery fallback: 1
+- discovery commands: max 2
+- initial file reads: max 3
+- discovery fallback: max 1
 
-Any expansion beyond these limits must have a specific risk hypothesis.
+Expand only for a concrete risk hypothesis.
 
 ## Discovery
 
-Prefer one compact collection command/script.
+Use the collected PR context as the primary source.
 
 Collect only:
 
 - PR metadata
 - base/head SHA
 - changed files
-- basic tech hints
+- relevant tech hints
 
-Do not retry through multiple tools unnecessarily.
+Do not rediscover metadata already available.
 
-Do not store the full diff in artifacts.
+Do not store the full diff.
 
 ## Impact
 
-Map only relevant:
+Map only what helps routing:
 
 - changed symbols
 - direct callers
@@ -57,19 +56,15 @@ Map only relevant:
 
 Batch searches when possible.
 
-Avoid per-symbol command loops.
-
 ## Risk
-
-Classify:
 
 | Risk | Rule | Max Reviewers | Max Verifiers |
 |---|---|---:|---:|
 | TRIVIAL | docs/metadata only | 0 | 0 |
 | LOW | small isolated behavior change | 1 | 0 |
-| MEDIUM | functional change in limited domains | 2 | 1 |
-| HIGH | auth, DB migration, public API, queue/security boundary | 3 | 1 |
-| CRITICAL | tenant/auth/crypto/data corruption critical risk | 4 | 1 |
+| MEDIUM | limited functional change | 2 | 1 |
+| HIGH | auth, DB, public API, queue or security boundary | 3 | 1 |
+| CRITICAL | auth/tenant/crypto/data corruption critical risk | 4 | 1 |
 
 ## Triggers
 
@@ -89,18 +84,17 @@ Detect only when supported by the PR:
 Select only relevant reviewers:
 
 - `code-review-specialist` → behavioral change
-- `security-review-specialist` → security/auth/tenant/input/crypto trigger
-- `test-impact-specialist` → complex coverage or explicit escalation
+- `security-review-specialist` → security/auth/tenant/input/crypto
+- `database-review-specialist` → schema/query/migration/transaction
+- `api-review-specialist` → API/route/schema/OpenAPI
+- `async-review-specialist` → queue/worker/background job
 - `architecture-review-specialist` → structural/boundary change
-- `database-review-specialist` → schema/query/migration/transaction change
-- `api-review-specialist` → public API/route/schema/OpenAPI change
-- `async-review-specialist` → queue/worker/background-job change
 
 Priority if budget is exceeded:
 
-`code → security → database → api → async → architecture → test-impact`
+`code → security → database → api → async → architecture`
 
-Budget is a ceiling, not a target.
+Budget is a maximum, not a target.
 
 ## Outputs
 
@@ -116,26 +110,26 @@ Keep outputs compact:
 - reviewer reasons: one line
 - no duplicated metadata
 - no full diff
+- omit empty optional structures
 
-`review-plan.json` must contain at least:
+`review-plan.json` must include:
 
 - `risk_level`
 - `agent_budget`
-- `domains`
 - `risk_triggers`
 - `selected_reviewers`
 - `skipped_reviewers`
-- `routing_discard_rate`
 
 ## Must Not
 
 - load specialist skills
 - perform specialist review
+- spawn reviewers
 - exceed limits without justification
 - repeat collected metadata
 - scan the repository broadly
-- run separate searches when one batch search is enough
+- use multiple searches when one batch search is enough
 
 ## Done When
 
-Context, impact map, risk, budget, and reviewer routing are written and ready for the next stage.
+Context, impact, risk, budget, and reviewer routing are ready for the orchestrator.

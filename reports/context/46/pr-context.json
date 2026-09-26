@@ -1,0 +1,23 @@
+{
+  "pr_id": 46,
+  "repository": "mp-ac/verifica-ai",
+  "title": "fix: resolvido erro ao passar conteúdo extraído do youtube para o agente de buscas",
+  "base_sha": "baa7c1ff217fdfd4b770e5c101a532dd57b71032",
+  "head_sha": "cfd8eaa50098bdbcacddfa8874b03047897505bd",
+  "additions": 93,
+  "deletions": 31,
+  "changed_files_count": 9,
+  "intent": "Fixes a bug where the full extracted YouTube content was passed as research context to the search agent. Introduces a dedicated compact formatter (format_research_context) that selects up to 3 segment summaries capped at 400 chars each, stores the result in a new youtube_research_context state field, and removes the old media_contexts lookup at the call sites in both the main and reanalysis graphs.",
+  "language": "Python",
+  "changed_files": [
+    "src/agents/youtube_agent/agent.py",
+    "src/agents/youtube_agent/formatting.py",
+    "src/graph/nodes.py",
+    "src/graph/state.py",
+    "src/graph/youtube.py",
+    "src/reanalysis/graph/nodes.py",
+    "src/reanalysis/graph/state.py",
+    "tests/test_reanalysis.py",
+    "tests/test_youtube_agent.py"
+  ]
+}

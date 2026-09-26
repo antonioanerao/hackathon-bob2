@@ -34,11 +34,13 @@ Review changed code for:
 
 Trace suspicious flows as:
 
-`source → validation/transformation → security boundary → sink`
+`source → validation → security boundary → sink`
 
 HIGH/CRITICAL findings require a concrete reachable path.
 
-Use existing Bandit/Semgrep/pip-audit results from context when available. Do not re-run them.
+Reuse existing security scan results from context.
+
+Do not re-run scanners or deterministic checks.
 
 ## Evidence
 
@@ -46,42 +48,44 @@ Each finding must include:
 
 - changed file/line
 - concrete attack path or tool evidence
-- attacker impact
+- practical security impact
 - actionable recommendation
 
-If runtime/tool proof is still needed:
+Do not emit speculative findings when one targeted read can confirm or refute them.
+
+If further proof is required, keep:
 
 `verification_status: UNVERIFIED`
 
-and recommend verification by `finding-verifier`.
+for `finding-verifier`.
 
 ## Output
 
-Write:
-
-`reports/findings/<pr-id>/security-review-specialist.json`
+Return findings as canonical JSON to the orchestrator.
 
 Finding IDs:
 
 `SEC-001`, `SEC-002`, ...
 
-Use the canonical finding schema.
+Set:
 
-Categories:
+`verification_status: UNVERIFIED`
 
-`AUTHENTICATION`, `AUTHORIZATION`, `TENANT_ISOLATION`,
-`SQL_INJECTION`, `COMMAND_INJECTION`, `SSRF`, `PATH_TRAVERSAL`,
-`IDOR`, `INSECURE_DESERIALIZATION`, `SECRET_EXPOSURE`,
-`CRYPTO_MISUSE`, `XSS`, `DEPENDENCY_CVE`, `UNSAFE_INPUT`.
+The orchestrator persists:
+
+`reports/findings/<pr-id>/security-review-specialist.json`
+
+If no concrete vulnerabilities exist, return an empty findings list.
 
 ## Must Not
 
 - execute scanners or tests
-- report pattern-only vulnerabilities without a reachable path
-- invent CVEs/tool results
-- assume a security control is absent without checking
-- report pre-existing issues as introduced by the PR
+- report theoretical vulnerabilities without a reachable path
+- invent CVEs or tool results
+- assume controls are absent without checking
+- report pre-existing issues as introduced
+- scan unrelated code
 
 ## Done When
 
-All security-relevant changes in scope were reviewed and evidence-backed findings were written.
+All relevant security changes were reviewed and evidence-backed findings were returned to the orchestrator.

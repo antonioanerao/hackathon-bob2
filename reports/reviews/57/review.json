@@ -1,0 +1,79 @@
+{
+  "pr_id": 57,
+  "repository": "mp-ac/verifica-ai",
+  "title": "feat: adicionado verificacao de duplicidade também para áudio, vídeo e imagem",
+  "risk_level": "MEDIUM",
+  "overall_verdict": "ADVISORY",
+  "blocking_count": 0,
+  "advisory_count": 4,
+  "refuted_count": 4,
+  "findings": [
+    {
+      "id": "CODE-003",
+      "severity": "MEDIUM",
+      "confidence": "HIGH",
+      "status": "ADVISORY",
+      "title": "Ordering change: LLM workflow always runs, even for known duplicates — cost/throughput trade-off",
+      "description": "Duplicate check now runs post-workflow. The check was previously run before the LLM workflow, using the raw user query. It now runs after using the normalized final-answer title. Since service.py's check is text-query-based only (no early-exit based on the duplicate result in the old flow either — the result was always computed after the job ran), this is primarily a semantic improvement. However, the ordering change means the full LLM workflow will always run regardless of duplicate status. If the product intent was to short-circuit expensive LLM inference for known duplicates in the future, that path is now closed.",
+      "file": "src/jobs/analyze.py",
+      "recommendation": "Document the explicit decision that duplicate check is post-hoc / advisory only and does not gate workflow execution. If LLM cost reduction for duplicates is a future goal, consider a lightweight pre-workflow title-based check.",
+      "root_cause": "execution-ordering-change"
+    },
+    {
+      "id": "ASYNC-003",
+      "severity": "MEDIUM",
+      "confidence": "HIGH",
+      "status": "ADVISORY",
+      "title": "Duplicate check appended to job end extends total wall-clock time, increasing RQ timeout risk",
+      "description": "In the old ordering the duplicate check ran pre-workflow and its latency was not additive to the LLM workflow. In the new ordering, total job duration = LLM workflow time + duplicate check network round-trip (Qdrant + optional LLM judge). If the RQ job_timeout is set near the expected LLM workflow duration, the added tail latency may trigger SIGKILL, leaving the job in a failed/retry state.",
+      "file": "src/jobs/analyze.py",
+      "recommendation": "Audit the configured `job_timeout` against the p95 combined latency. Increase if the margin is insufficient.",
+      "root_cause": "job-timeout-budget"
+    },
+    {
+      "id": "CODE-004",
+      "severity": "MEDIUM",
+      "confidence": "HIGH",
+      "status": "ADVISORY",
+      "title": "Verdict-only titles silently bypass duplicate check with no observability signal",
+      "description": "When `final_answer.title` consists only of a classification prefix (e.g. `'FALSO:'`), `strip_classification_prefix` returns an empty/falsy string, `build_duplicate_check_query` returns `None`, and `check_duplicate_analysis` returns `outcome='skipped'`. This is the correct behavior per the service's guard, but it is invisible — no log message, metric, or trace attribute distinguishes 'skipped because query was empty after prefix stripping' from 'skipped because semantic retriever is disabled'. In production, misclassified titles that accidentally match the prefix pattern will silently skip duplicate detection.",
+      "file": "src/similarity/query.py",
+      "recommendation": "Add a debug-level log in `build_duplicate_check_query` when a non-None `final_answer` produces a `None` result: `logger.debug('build_duplicate_check_query: normalized title is empty after prefix stripping for title %r', final_answer.title)`",
+      "root_cause": "observability-gap"
+    },
+    {
+      "id": "ASYNC-005",
+      "severity": "LOW",
+      "confidence": "HIGH",
+      "status": "ADVISORY",
+      "title": "Duplicate check result does not gate Qdrant persistence — advisory outcome is never consulted",
+      "description": "`dispatch_completed_result` and `run_duplicate_check` both run, but the duplicate check outcome (`exact_match`, `match`, `uncertain`, `no_match`) is returned in the job result without influencing the `persist_to_qdrant` flag. This is a documented advisory mode, but the intent should be explicit for future maintainers.",
+      "file": "src/jobs/analyze.py",
+      "recommendation": "Add a comment in `_process_analyze_job` explaining that duplicate checking is advisory-only and the outcome intentionally does not gate persistence.",
+      "root_cause": "advisory-mode-undocumented"
+    },
+    {
+      "id": "CODE-005",
+      "severity": "LOW",
+      "confidence": "HIGH",
+      "status": "ADVISORY",
+      "title": "None-query downstream path not tested in integration",
+      "description": "The three unit tests in `test_similarity_query.py` verify `build_duplicate_check_query` in isolation. None test the integration path: `build_duplicate_check_query(None)` → `run_duplicate_check(None, [], ...)` → `check_duplicate_analysis(None, [])`. While this path is safe (returns `skipped`), an integration test would document this guarantee explicitly.",
+      "file": "tests/test_similarity_query.py",
+      "recommendation": "Add a test in `test_similarity_worker.py` asserting that `_process_analyze_job` with `workflow` producing `final_answer=None` results in `duplicate_check['outcome'] == 'skipped'`.",
+      "root_cause": "test-coverage-gap"
+    }
+  ],
+  "refuted_findings": [
+    {"id": "CODE-001", "reason": "explicit_attachments is a skip-guard, not a data carrier. Passing [] is correct semantics."},
+    {"id": "CODE-002", "reason": "check_duplicate_analysis handles None query safely via normalized_query empty string guard → outcome='skipped'."},
+    {"id": "ASYNC-001", "reason": "Actual code order: run_duplicate_check THEN dispatch_completed_result. Ordering premise was wrong."},
+    {"id": "ASYNC-004", "reason": "Same root cause as CODE-001. [] is correct; non-empty list would skip the check."}
+  ],
+  "verification": {
+    "ran": true,
+    "findings_verified": ["CODE-001", "CODE-002", "ASYNC-001", "ASYNC-004"],
+    "all_refuted": true
+  },
+  "summary": "The PR correctly refactors the duplicate check to use the normalized final-answer title instead of the raw user query, enabling semantic deduplication for media content (audio/video/image) whose transcripts/descriptions are embedded in the answer title. The core logic is sound and well-tested. Four specialist findings were refuted by code evidence. Four advisory findings remain: a documented ordering trade-off, a job timeout budget concern, a missing observability signal for empty titles, and a minor test coverage gap. No BLOCKING findings."
+}

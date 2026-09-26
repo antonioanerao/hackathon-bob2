@@ -20,17 +20,22 @@ Re-verify existing findings without re-running the review pipeline.
 
 ## Inputs
 
-- `reports/findings/<pr-id>/*.json`
-- `reports/context/<pr-id>/pr-context.json`
-- existing `reports/verification/<pr-id>/verification-results.json`, if present
+Required:
 
-Stop if required artifacts are missing.
+- `reports/findings/<pr-id>/*.json`
+
+Optional:
+
+- `reports/context/<pr-id>/pr-context.json`
+- `reports/verification/<pr-id>/verification-results.json`
+
+If no findings exist, report and stop.
 
 ## Action
 
 1. Validate `<pr-id>`.
-2. Load existing findings and verification results.
-3. Select only:
+2. Load findings and previous verification results, if any.
+3. Select:
    - `UNVERIFIED`
    - `VERIFICATION_FAILED`
 4. Load `finding-verification`.
@@ -46,17 +51,31 @@ Stop if required artifacts are missing.
 
 If no unresolved findings exist, stop with a short notice.
 
+## Rules
+
+- Verify only existing findings.
+- Use minimum files and commands required.
+- Prefer existing evidence before executing tools.
+- Do not re-run deterministic checks unnecessarily.
+
 ## Must Not
 
 - re-run specialist reviewers
 - create new findings
+- change finding severity
 - modify production code/config/migrations
-- overwrite prior verified/refuted results without explicit targeting
+- overwrite prior `VERIFIED` or `REFUTED` results without explicit targeting
 - fabricate evidence or tool output
-- commit, push, or publish
+- commit, push, merge, or publish
 
 ## Completion
 
-Show counts by verification status and suggest:
+The command is complete only when:
+
+`reports/verification/<pr-id>/verification-results.json`
+
+has been written.
+
+Show a short verification summary and suggest:
 
 `/pr-guardian-report <pr-id>`
