@@ -2,39 +2,27 @@
   "specialist": "code-review-specialist",
   "findings": [
     {
-      "id": "CODE-001",
+      "id": "PREFIX-001",
       "severity": "MEDIUM",
       "category": "Code Duplication",
       "title": "Potential code duplication",
       "file": "src/jobs/analyze.py",
-      "line": 65,
-      "evidence": "The same duplicate check code is executed twice in the `_process_analyze_job` function.",
-      "impact": "The code is duplicated, which can lead to inconsistencies and potential bugs if one instance is fixed but the other is not.",
-      "recommendation": "Refactor the code to avoid duplication. Consider extracting the duplicate check logic into a separate function.",
+      "line": 66,
+      "evidence": "The `duplicate_check` block is duplicated in the code.",
+      "impact": "The code can be simplified and made more maintainable.",
+      "recommendation": "Refactor the code to avoid duplication.",
       "verification_status": "UNVERIFIED"
     },
     {
-      "id": "CODE-002",
+      "id": "PREFIX-002",
       "severity": "MEDIUM",
-      "category": "Code Complexity",
-      "title": "Complexity in `_process_analyze_job`",
-      "file": "src/jobs/analyze.py",
-      "line": 65,
-      "evidence": "The `_process_analyze_job` function is quite complex, with multiple responsibilities.",
-      "impact": "High complexity can make the code harder to understand, maintain, and test.",
-      "recommendation": "Refactor the function to reduce its complexity. Consider breaking it down into smaller, more focused functions.",
-      "verification_status": "UNVERIFIED"
-    },
-    {
-      "id": "CODE-003",
-      "severity": "LOW",
-      "category": "Code Readability",
-      "title": "Variable naming",
-      "file": "src/jobs/analyze.py",
-      "line": 65,
-      "evidence": "The variable `final_answer_data` is not descriptive.",
-      "impact": "Less descriptive variable names can make the code harder to understand.",
-      "recommendation": "Rename the variable to something more descriptive, such as `final_answer_summary`.",
+      "category": "Test Coverage",
+      "title": "Insufficient test coverage for new code",
+      "file": "tests/test_similarity_query.py",
+      "line": 1,
+      "evidence": "The new test file `test_similarity_query.py` does not have any test cases.",
+      "impact": "The new functionality may not be thoroughly tested.",
+      "recommendation": "Add test cases to ensure the new functionality works as expected.",
       "verification_status": "UNVERIFIED"
     }
   ]

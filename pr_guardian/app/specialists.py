@@ -2,18 +2,12 @@ from __future__ import annotations
 
 from typing import Any
 
+from .config import get_specialists
 from .ollama_client import OllamaClient
 from .prompts import global_rules, skill
 
 
-SPECIALISTS = {
-    "code-review-specialist": "code-review",
-    "security-review-specialist": "security-review",
-    "database-review-specialist": "database-review",
-    "api-review-specialist": "api-review",
-    "architecture-review-specialist": "architecture-review",
-    "async-review-specialist": "queue-review",
-}
+SPECIALISTS = get_specialists()
 
 
 def run_specialist(
@@ -22,6 +16,11 @@ def run_specialist(
     diff: str,
     model: str,
 ) -> dict[str, Any]:
+
+    if specialist not in SPECIALISTS:
+        raise RuntimeError(
+            f"Unknown specialist: {specialist}"
+        )
 
     skill_name = SPECIALISTS[specialist]
 
@@ -42,12 +41,17 @@ Follow this specialist skill:
 
 {skill(skill_name)}
 
-You review only the supplied PR changes.
+Review only the supplied PR changes.
 
 Return JSON only.
 
-Do not invent files, lines, behavior, vulnerabilities,
-dependencies, or runtime evidence.
+Do not invent:
+- files
+- lines
+- behavior
+- vulnerabilities
+- dependencies
+- runtime evidence
 """
 
     prompt = f"""
@@ -61,17 +65,17 @@ CHANGED CODE:
 
 {diff}
 
-Return:
+Return JSON only in this format:
 
 {{
   "specialist": "{specialist}",
   "findings": [
     {{
-      "id": "CODE-001",
+      "id": "PREFIX-001",
       "severity": "LOW|MEDIUM|HIGH|CRITICAL",
       "category": "CATEGORY",
       "title": "Short title",
-      "file": "path/file.py",
+      "file": "path/to/file",
       "line": 1,
       "evidence": "Concrete evidence",
       "impact": "Practical impact",
@@ -81,7 +85,7 @@ Return:
   ]
 }}
 
-If there are no concrete defects:
+If no concrete findings exist, return:
 
 {{
   "specialist": "{specialist}",
@@ -89,7 +93,24 @@ If there are no concrete defects:
 }}
 """
 
-    return client.chat_json(
+    result = client.chat_json(
         system=system,
         prompt=prompt,
     )
+
+    if not isinstance(result, dict):
+        raise RuntimeError(
+            f"Invalid response from specialist: {specialist}"
+        )
+
+    findings = result.get("findings", [])
+
+    if not isinstance(findings, list):
+        raise RuntimeError(
+            f"Invalid findings returned by specialist: {specialist}"
+        )
+
+    result["specialist"] = specialist
+    result["findings"] = findings
+
+    return result

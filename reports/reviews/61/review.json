@@ -1,0 +1,10 @@
+{
+  "pr_id": 61,
+  "repository": "mp-ac/verifica-ai",
+  "risk_level": "LOW",
+  "selected_reviewers": [
+    "code-review-specialist"
+  ],
+  "blocking": [],
+  "advisory": []
+}

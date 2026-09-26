@@ -2,18 +2,14 @@ from __future__ import annotations
 
 from typing import Any
 
+from .config import get_specialists
 from .ollama_client import OllamaClient
 from .prompts import global_rules, skill
 
 
-ALLOWED_REVIEWERS = {
-    "code-review-specialist",
-    "security-review-specialist",
-    "database-review-specialist",
-    "api-review-specialist",
-    "async-review-specialist",
-    "architecture-review-specialist",
-}
+ALLOWED_REVIEWERS = set(
+    get_specialists().keys()
+)
 
 
 def run_triage(
@@ -21,7 +17,13 @@ def run_triage(
     model: str,
 ) -> dict[str, Any]:
 
-    client = OllamaClient(model=model)
+    client = OllamaClient(
+        model=model
+    )
+
+    reviewer_list = sorted(
+        ALLOWED_REVIEWERS
+    )
 
     system = f"""
 You are PR Guardian pr-triage.
@@ -54,18 +56,13 @@ Analyze this Pull Request context:
 
 Return JSON only.
 
-The field "selected_reviewers" MUST contain only values from this exact list:
+The field "selected_reviewers" MUST contain only values
+from this exact list:
 
-[
-  "code-review-specialist",
-  "security-review-specialist",
-  "database-review-specialist",
-  "api-review-specialist",
-  "async-review-specialist",
-  "architecture-review-specialist"
-]
+{reviewer_list}
 
-The field "skipped_reviewers" MUST also contain only values from that same list.
+The field "skipped_reviewers" MUST also contain only values
+from that same list.
 
 Never return:
 - usernames
@@ -92,26 +89,42 @@ Return exactly:
         prompt=prompt,
     )
 
+    if not isinstance(result, dict):
+        raise RuntimeError(
+            "Invalid triage response: expected JSON object."
+        )
+
     selected = result.get(
         "selected_reviewers",
         [],
     )
 
-    invalid = [
+    skipped = result.get(
+        "skipped_reviewers",
+        [],
+    )
+
+    if not isinstance(selected, list):
+        raise RuntimeError(
+            "Invalid selected_reviewers: expected a list."
+        )
+
+    if not isinstance(skipped, list):
+        raise RuntimeError(
+            "Invalid skipped_reviewers: expected a list."
+        )
+
+    invalid_selected = [
         reviewer
         for reviewer in selected
         if reviewer not in ALLOWED_REVIEWERS
     ]
 
-    if invalid:
+    if invalid_selected:
         raise RuntimeError(
-            f"Invalid reviewers returned by model: {invalid}"
+            "Invalid reviewers returned by model: "
+            f"{invalid_selected}"
         )
-
-    skipped = result.get(
-        "skipped_reviewers",
-        [],
-    )
 
     invalid_skipped = [
         reviewer
@@ -121,8 +134,11 @@ Return exactly:
 
     if invalid_skipped:
         raise RuntimeError(
-            f"Invalid skipped reviewers returned by model: "
+            "Invalid skipped reviewers returned by model: "
             f"{invalid_skipped}"
         )
+
+    result["selected_reviewers"] = selected
+    result["skipped_reviewers"] = skipped
 
     return result
