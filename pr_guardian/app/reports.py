@@ -102,6 +102,7 @@ def build_report_markdown(
     review_plan: dict[str, Any],
     findings: list[dict[str, Any]],
     style_review: dict[str, Any],
+    summary: str,
 ) -> str:
 
     blocking, advisory = (
@@ -132,6 +133,8 @@ def build_report_markdown(
         f"**Risk Level:** `{review_plan.get('risk_level', 'UNKNOWN')}`",
         "",
         "## Summary",
+        "",
+        summary,
         "",
         f"- Changed files: {context.get('changed_files_count', 0)}",
         f"- Additions: {context.get('additions', 0)}",
@@ -256,6 +259,7 @@ def write_report(
     context: dict[str, Any],
     review_plan: dict[str, Any],
     style_review: dict[str, Any],
+    summary: str,
 ) -> None:
 
     findings_dir = (
@@ -282,6 +286,7 @@ def write_report(
         "risk_level": review_plan.get(
             "risk_level",
         ),
+        "summary": summary,
         "selected_reviewers": (
             review_plan.get(
                 "selected_reviewers",
@@ -321,6 +326,7 @@ def write_report(
         review_plan=review_plan,
         findings=findings,
         style_review=style_review,
+        summary=summary,
     )
 
     (

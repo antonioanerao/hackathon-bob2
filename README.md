@@ -20,6 +20,8 @@ pr_guardian/app/orchestrator.py
         ↓
 triage (Ollama)  →  review-plan.json
         ↓
+PR summary (Ollama, PR description + diff) → summary.json
+        ↓
 specialist loop (Ollama, one per selected reviewer)
         ↓
 reports/findings/<pr-id>/<specialist>.json
@@ -46,6 +48,7 @@ pr_guardian/           Python backend
     ├── config.py      Reads PR_GUARDIAN_SPECIALISTS from env
     ├── orchestrator.py Full pipeline: collect → triage → specialists → report
     ├── triage.py      Calls Ollama to classify risk and select reviewers
+    ├── pr_summary.py  Summarizes what the PR changes and why
     ├── specialists.py Calls Ollama for each selected specialist
     ├── ollama_client.py HTTP client for Ollama /api/chat (JSON mode)
     ├── git_diff.py    Fetches the unified diff via GitHub API
@@ -59,6 +62,7 @@ scripts/
 reports/               Generated artifacts (git-ignored)
 ├── context/<pr-id>/pr-context.json
 ├── plans/<pr-id>/review-plan.json
+├── summaries/<pr-id>/summary.json
 ├── findings/<pr-id>/<specialist>.json
 ├── style/<pr-id>/pep8.json
 └── reviews/<pr-id>/review.json + review.md
@@ -140,16 +144,19 @@ python main.py
 The pipeline prints progress and writes artifacts under `reports/`:
 
 ```
-[1/5] Collecting PR context...
-[2/5] Running triage...
+[1/6] Collecting PR context...
+[2/6] Running triage...
 Risk: HIGH
 Reviewers: ['code-review-specialist', 'security-review-specialist']
-[3/5] Loading PR diff...
-[4/5] Running specialists...
+[3/6] Loading PR diff...
+[4/6] Generating PR summary...
+[5/6] Reviewing PR changes...
+  Running specialists...
   → code-review-specialist
   → security-review-specialist
-[5/5] Generating final report...
-[5/5] Review finished.
+  Checking Python conventions...
+[6/6] Generating final report...
+Review finished.
 Findings: 3
 Python conventions: 2 issues
 CODE-001 HIGH ...
@@ -196,12 +203,15 @@ All outputs are written under `reports/` and are git-ignored.
 |---|---|
 | `reports/context/<pr-id>/pr-context.json` | Raw PR metadata from collection |
 | `reports/plans/<pr-id>/review-plan.json` | Triage output: risk level, selected reviewers, agent budget |
+| `reports/summaries/<pr-id>/summary.json` | Short description of what changed and why |
 | `reports/findings/<pr-id>/<specialist>.json` | Raw findings per specialist |
 | `reports/style/<pr-id>/pep8.json` | Ruff results for changed Python lines |
 | `reports/reviews/<pr-id>/review.json` | Synthesised review (blocking + advisory) |
 | `reports/reviews/<pr-id>/review.md` | Human-readable review report |
 
 Python convention checks run independently of triage when a PR changes Python files. Ruff checks the complete file at the PR head SHA with `E`, `W`, and `N` rules and a 79-character line limit; the report includes only diagnostics on added or modified lines. Convention issues appear in a separate report section and do not count as behavioral findings.
+
+The report's Summary section starts with 2–4 sentences generated from the PR title, description preview, and diff. The summary is saved separately and included in `review.json`. When the PR does not state a motivation, the model is instructed to say so rather than infer one.
 
 ### Finding schema
 
