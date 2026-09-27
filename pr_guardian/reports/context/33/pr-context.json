@@ -1,0 +1,83 @@
+{
+  "pr_id": 33,
+  "repository_name": "mp-ac/verifica-ai",
+  "title": "feat: Adicionado identificacao de aplicacao e tokens na requisicao",
+  "body_preview": "",
+  "base_sha": "55c86ba89d4e3dd4dc93e3653089c9360aec80b4",
+  "head_sha": "9b383d60f3303038930ac0346b4ae22bd9e19a47",
+  "additions": 341,
+  "deletions": 15,
+  "changed_files_count": 10,
+  "changed_files": [
+    {
+      "path": "README.md",
+      "status": "modified",
+      "additions": 35,
+      "deletions": 0
+    },
+    {
+      "path": "src/auth/models.py",
+      "status": "modified",
+      "additions": 31,
+      "deletions": 2
+    },
+    {
+      "path": "src/auth/repository.py",
+      "status": "modified",
+      "additions": 80,
+      "deletions": 9
+    },
+    {
+      "path": "src/jobs.py",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 0
+    },
+    {
+      "path": "src/main.py",
+      "status": "modified",
+      "additions": 24,
+      "deletions": 3
+    },
+    {
+      "path": "src/schemas/__init__.py",
+      "status": "modified",
+      "additions": 6,
+      "deletions": 0
+    },
+    {
+      "path": "src/schemas/api.py",
+      "status": "modified",
+      "additions": 23,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_analyze_attachments.py",
+      "status": "modified",
+      "additions": 21,
+      "deletions": 1
+    },
+    {
+      "path": "tests/test_auth_repository.py",
+      "status": "added",
+      "additions": 76,
+      "deletions": 0
+    },
+    {
+      "path": "tests/test_qdrant_queue.py",
+      "status": "modified",
+      "additions": 42,
+      "deletions": 0
+    }
+  ],
+  "repository": {
+    "language": "Python",
+    "framework": "",
+    "test_framework": "",
+    "package_manager": "",
+    "database": "",
+    "queue": "",
+    "ci": ""
+  },
+  "collection_method": "github_api"
+}

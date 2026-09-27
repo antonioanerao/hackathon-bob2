@@ -1,3 +1,4 @@
+````
 ---
 name: queue-review
 description: >
@@ -758,6 +759,70 @@ Do not increase severity based on unknown queue volume.
 
 ---
 
+# Specialist Summary
+
+Every queue review must return a concise specialist summary for direct inclusion
+in the final PR Guardian report.
+
+The summary must contain exactly three semantic paragraphs represented by the
+following fields:
+
+1. `analysis`
+   - explain what asynchronous or queue-related behavior was reviewed
+   - identify the main producers, consumers, workers, retry paths,
+     acknowledgment behavior, message schemas, queue configuration, timeout
+     settings, scheduling, or transactional boundaries actually inspected
+   - mention relevant changed files, tasks, workers, queues, or modules when
+     available
+
+2. `result`
+   - explain what the queue review concluded
+   - summarize whether concrete async findings were identified
+   - describe the main delivery, retry, idempotency, acknowledgment, ordering,
+     timeout, serialization, worker-lifecycle, partial-failure, or
+     producer/consumer compatibility impacts observed
+   - if no finding exists, explicitly state that no evidence-backed async defect
+     was identified within the reviewed scope
+
+3. `implementation`
+   - explain where the reviewed asynchronous behavior is implemented
+   - point to the most relevant changed files and code locations
+   - identify concrete producers, consumers, worker functions, task handlers,
+     queue declarations, retry configuration, serializers, timeout settings, or
+     directly related persistence boundaries when available
+
+The summary must:
+
+- be based only on evidence actually reviewed by this specialist
+- not invent queues, topics, workers, delivery guarantees, acknowledgment
+  semantics, retry defaults, timeout values, broker behavior, findings, or
+  impact
+- not claim task execution, message publication, broker startup, verification,
+  scanner output, or tests that did not occur
+- not duplicate the complete findings list
+- remain concise enough for direct inclusion in `review.md`
+- remain understandable without requiring the raw diff
+- use factual technical prose rather than generic distributed-systems advice
+
+If no concrete async defect exists, `result` must still describe the review
+outcome and state that no evidence-backed async finding was identified.
+
+Example:
+
+```json
+{
+  "summary": {
+    "analysis": "Reviewed the changed payment worker, retry configuration, acknowledgment timing, and message payload handling, focusing on duplicate delivery, idempotency, terminal failure, and producer/consumer compatibility.",
+    "result": "No evidence-backed async defect was identified in the reviewed scope. The changed worker preserves the existing acknowledgment order, retry behavior, and message contract without establishing a concrete duplication, loss, or serialization regression.",
+    "implementation": "The reviewed behavior is implemented primarily in `workers/payment_worker.py`, the related queue registration, and the message schema consumed by the payment task."
+  }
+}
+```
+
+The orchestrator owns persistence and final rendering of the summary.
+
+---
+
 # Verification
 
 All specialist findings must initially use:
@@ -782,11 +847,22 @@ The finding verifier may later confirm or refute it.
 
 Return JSON only.
 
+The specialist result must contain:
+
+- `specialist`
+- `summary`
+- `findings`
+
 Expected structure:
 
 ```json
 {
   "specialist": "async-review-specialist",
+  "summary": {
+    "analysis": "Reviewed the changed payment worker, acknowledgment timing, retry behavior, and related message-processing path.",
+    "result": "The review identified one evidence-backed delivery regression: the worker acknowledges the message before required processing completes, creating a concrete message-loss path on failure.",
+    "implementation": "The affected lifecycle is implemented in `workers/payment_worker.py`, where acknowledgment now occurs before `persist_payment()` and `notify_gateway()`."
+  },
   "findings": [
     {
       "id": "ASYNC-001",
@@ -804,14 +880,28 @@ Expected structure:
 }
 ```
 
-If no concrete async defect exists:
+If no concrete async defect exists, still return the three-paragraph summary:
 
 ```json
 {
   "specialist": "async-review-specialist",
+  "summary": {
+    "analysis": "Reviewed the changed producers, consumers, worker lifecycle, retry behavior, acknowledgment flow, message contracts, and directly related queue configuration.",
+    "result": "No evidence-backed async defect was identified within the reviewed scope.",
+    "implementation": "The reviewed asynchronous behavior is implemented in the changed worker, task, producer, consumer, configuration, and message-handling components identified in the Pull Request."
+  },
   "findings": []
 }
 ```
+
+`summary.analysis`, `summary.result`, and `summary.implementation` are required
+even when `findings` is empty.
+
+All specialist findings must use:
+
+`verification_status: UNVERIFIED`
+
+The summary must describe only what this specialist actually reviewed.
 
 ---
 
@@ -859,7 +949,7 @@ Do not create multiple findings for the same root cause solely because several c
 
 # Artifact Ownership
 
-Return findings to the orchestrator.
+Return the complete specialist result, including `summary` and `findings`, to the orchestrator.
 
 Do not write artifacts directly.
 
@@ -894,6 +984,8 @@ Do not:
 - invent broker behavior
 - report generic distributed-systems advice
 - report pre-existing async issues as introduced
+- invent summary content not supported by the reviewed evidence
+- claim queues, workers, delivery behavior, configuration, or code locations in the summary that were not actually inspected
 - write artifacts directly
 - commit
 - push
@@ -915,6 +1007,9 @@ The queue review is complete when:
 - timeout and serialization changes were assessed where applicable
 - speculative hypotheses were confirmed or discarded when one targeted read was sufficient
 - every reported finding contains concrete async evidence
-- canonical findings JSON was returned to the orchestrator
+- the three required summary paragraphs were produced from reviewed evidence
+- the complete specialist JSON (`summary` + `findings`) was returned to the orchestrator
 
-If no evidence-backed async defect exists, return an empty findings list.
+If no evidence-backed async defect exists, return an empty findings list together with the required three-paragraph specialist summary.
+
+````

@@ -1,0 +1,9 @@
+{
+  "specialist": "security-review-specialist",
+  "summary": {
+    "analysis": "Reviewed the changes related to token management, authentication, and request handling in the Pull Request. Specifically, the review focused on the addition of application identification and tokens in the request, changes in the authentication models and repository, and modifications in the main application and job processing logic.",
+    "result": "No evidence-backed security vulnerability was identified within the reviewed scope. The changes introduced additional fields for application identification and tokens, but did not introduce any concrete security issues such as authentication bypass, authorization bypass, privilege escalation, or other security regressions.",
+    "implementation": "The reviewed security behavior is implemented in the following files: `src/auth/models.py`, `src/auth/repository.py`, `src/main.py`, and `src/jobs.py`. The changes include updates to the token models, repository methods, request handling, and job processing logic."
+  },
+  "findings": []
+}

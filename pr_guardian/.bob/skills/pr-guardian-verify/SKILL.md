@@ -1,3 +1,4 @@
+````
 ---
 name: pr-guardian-verify
 description: >
@@ -34,7 +35,7 @@ It must not:
 - change finding severity
 - reinterpret the original review scope
 
-The command consumes existing findings and produces or updates verification evidence.
+The command consumes existing findings and produces or updates verification evidence together with a concise three-paragraph verification summary for the final PR Guardian report.
 
 ---
 
@@ -120,8 +121,9 @@ Before verification:
 5. validate finding schemas
 6. load previous verification results when present
 7. validate prior verification structure
-8. map prior results by exact `finding_id`
-9. identify unresolved candidates
+8. validate prior verification summary when present
+9. map prior results by exact `finding_id`
+10. identify unresolved candidates
 
 Stop when malformed input prevents safe verification.
 
@@ -248,7 +250,11 @@ Existing:
 
 results must be preserved by default.
 
-Do not overwrite them unless the command explicitly supports targeted re-verification.
+Preserve the prior verification summary when no verification result is
+re-evaluated.
+
+Do not overwrite resolved results unless the command explicitly supports
+targeted re-verification.
 
 Existing:
 
@@ -603,9 +609,77 @@ Do not convert this state to `REFUTED`.
 
 ---
 
-# Stage 9 — Build Verification Results
+# Stage 9 — Build Verification Summary and Results
 
-Each result must contain:
+Every verification run must produce a concise summary for direct inclusion in the
+final PR Guardian report.
+
+The summary must contain exactly three semantic paragraphs represented by:
+
+- `analysis`
+- `result`
+- `implementation`
+
+## `analysis`
+
+Explain:
+
+- which existing findings were selected for verification
+- which verification hypotheses were evaluated
+- which evidence sources, code paths, configuration, tests, dependency metadata,
+  or other targeted artifacts were actually inspected
+- relevant finding IDs when useful
+
+## `result`
+
+Explain:
+
+- what verification concluded
+- which findings became `VERIFIED`, `REFUTED`, `UNVERIFIED`,
+  `NOT_APPLICABLE`, or `VERIFICATION_FAILED`
+- the practical evidentiary outcome
+- when no eligible findings exist, state that verification was not required
+
+Do not change:
+
+- severity
+- category
+- original finding meaning
+
+## `implementation`
+
+Explain:
+
+- where the verified, refuted, or unresolved behavior is implemented
+- the most relevant files, symbols, routes, schemas, configuration, migrations,
+  dependencies, or targeted tests actually used as evidence
+- targeted command context when execution occurred, without reproducing excessive
+  output
+
+The summary must:
+
+- be based only on verification work that actually occurred
+- not create new findings
+- not invent files, symbols, commands, tests, exit codes, runtime behavior,
+  package versions, CVEs, or outcomes
+- not claim `VERIFIED` or `REFUTED` without positive evidence
+- not duplicate the complete per-finding verification results
+- remain concise enough for direct inclusion in `review.md`
+- remain understandable without requiring the raw verification artifact
+
+Example:
+
+```json
+{
+  "summary": {
+    "analysis": "Verified findings `SEC-001` and `CODE-003` using the existing specialist evidence, the changed route and service code, and one targeted code-path inspection.",
+    "result": "`SEC-001` was VERIFIED because the changed request path reaches the protected operation without the required authorization guard. `CODE-003` remained UNVERIFIED because the required runtime condition could not be established from the available static evidence.",
+    "implementation": "The evidence for `SEC-001` is implemented in `src/api/orders.py` and the directly called update service. The unresolved behavior for `CODE-003` is located in `src/services/order_processor.py`."
+  }
+}
+```
+
+Each individual verification result must still contain:
 
 - `finding_id`
 - `status`
@@ -614,6 +688,7 @@ Each result must contain:
 - `command`
 - `exit_code`
 - `notes`
+
 
 Use:
 
@@ -677,8 +752,13 @@ When prior verification exists:
 4. maintain one authoritative result per `finding_id`
 5. retain useful prior evidence when appropriate
 6. preserve traceability
+7. rebuild or update the verification summary only from the actual verification
+   work and current authoritative results
 
 Do not erase valid historical evidence without reason.
+
+The merged summary must not claim verification work that did not occur in the
+current or preserved authoritative verification state.
 
 ---
 
@@ -705,11 +785,16 @@ Write:
 
 `reports/verification/<pr-id>/verification-results.json`
 
-Recommended structure:
+Required structure:
 
 ```json
 {
   "pr_id": 42,
+  "summary": {
+    "analysis": "Verified the selected unresolved findings using existing specialist evidence and targeted code-path inspection.",
+    "result": "One finding was VERIFIED and one remained UNVERIFIED because the required runtime condition could not be established safely from the available evidence.",
+    "implementation": "Verification evidence was taken from the changed route, service implementation, and directly related configuration referenced by the original findings."
+  },
   "results": [
     {
       "finding_id": "SEC-001",
@@ -724,9 +809,34 @@ Recommended structure:
 }
 ```
 
+Required summary fields:
+
+- `summary.analysis`
+- `summary.result`
+- `summary.implementation`
+
+Each must be a non-empty string.
+
+If no eligible findings exist and a no-op artifact is written, use:
+
+```json
+{
+  "pr_id": 42,
+  "summary": {
+    "analysis": "No unresolved findings were eligible for verification in this run.",
+    "result": "Verification was not required because no eligible unresolved findings were selected.",
+    "implementation": "No code path, configuration, dependency, or test artifact required additional verification."
+  },
+  "results": []
+}
+```
+
 The runtime controls the output path.
 
 Do not allow the model to choose a destination.
+
+Do not regenerate or rewrite the verification summary during final synthesis.
+The report stage must render the persisted summary deterministically.
 
 ---
 
@@ -794,6 +904,9 @@ That belongs to deterministic final synthesis.
 
 The verifier sets only verification status and supporting evidence.
 
+The verifier also authors the three-paragraph verification summary. Final
+synthesis must render that persisted summary without reinterpretation.
+
 ---
 
 # No Findings
@@ -802,6 +915,8 @@ If no findings exist:
 
 - show a short notice
 - do not create fake verification entries
+- if a no-op verification artifact is written, include the required
+  three-paragraph summary
 - stop
 
 ---
@@ -817,7 +932,7 @@ then:
 
 - report that verification is already resolved
 - do not re-run verification
-- preserve the existing verification artifact
+- preserve the existing verification artifact and its summary
 - stop
 
 ---
@@ -892,6 +1007,9 @@ Do not:
 - fabricate runtime behavior
 - fabricate package versions
 - fabricate CVEs
+- fabricate verification summary content
+- claim files, symbols, commands, tests, or implementation locations in the summary that were not actually inspected
+- rewrite specialist summaries
 - overwrite prior `VERIFIED` results without explicit targeting
 - overwrite prior `REFUTED` results without explicit targeting
 - commit
@@ -910,7 +1028,12 @@ The command is complete when either:
 
 `reports/verification/<pr-id>/verification-results.json`
 
-has been successfully created or updated.
+has been successfully created or updated with:
+
+- a valid `summary.analysis`
+- a valid `summary.result`
+- a valid `summary.implementation`
+- authoritative per-finding verification results.
 
 or:
 
@@ -931,6 +1054,7 @@ Display a concise summary containing:
 - remaining unverified findings
 - not-applicable findings
 - verification failures
+- whether a verification summary was produced
 - artifact path
 
 Example:
@@ -956,3 +1080,5 @@ Then suggest:
 `/pr-guardian-report <pr-id>`
 
 to regenerate the deterministic final report.
+
+````

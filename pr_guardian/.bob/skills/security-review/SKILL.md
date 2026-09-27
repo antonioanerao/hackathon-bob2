@@ -1,3 +1,4 @@
+````
 ---
 name: security-review
 description: >
@@ -833,6 +834,70 @@ Do not use CRITICAL merely because the vulnerability class is serious.
 
 ---
 
+# Specialist Summary
+
+Every security review must return a concise specialist summary for direct
+inclusion in the final PR Guardian report.
+
+The summary must contain exactly three semantic paragraphs represented by the
+following fields:
+
+1. `analysis`
+   - explain what security-relevant behavior was reviewed
+   - identify the main trust boundaries, authentication or authorization paths,
+     tenant controls, untrusted-input flows, file handling, secret handling,
+     cryptographic operations, external requests, dependency changes, or
+     security-sensitive configuration actually inspected
+   - mention relevant changed files, routes, services, middleware, repositories,
+     schemas, configuration entries, or dependencies when available
+
+2. `result`
+   - explain what the security review concluded
+   - summarize whether concrete security findings were identified
+   - describe the main authentication, authorization, tenant-isolation,
+     injection, SSRF, path traversal, file-handling, secret, cryptographic,
+     dependency, or configuration impacts observed
+   - if no finding exists, explicitly state that no evidence-backed security
+     vulnerability was identified within the reviewed scope
+
+3. `implementation`
+   - explain where the reviewed security behavior is implemented
+   - point to the most relevant changed files and code locations
+   - identify concrete routes, middleware, guards, services, repositories,
+     validation functions, filesystem operations, HTTP clients, cryptographic
+     helpers, configuration entries, or dependency declarations when available
+
+The summary must:
+
+- be based only on evidence actually reviewed by this specialist
+- not invent files, symbols, routes, attacker control, trust boundaries,
+  missing controls, dependencies, CVEs, runtime behavior, findings, or impact
+- not claim tests, scanner execution, exploit attempts, network probing,
+  verification, or runtime execution that did not occur
+- not duplicate the complete findings list
+- remain concise enough for direct inclusion in `review.md`
+- remain understandable without requiring the raw diff
+- use factual technical prose rather than generic security commentary
+
+If no concrete security vulnerability exists, `result` must still describe the
+review outcome and state that no evidence-backed security finding was identified.
+
+Example:
+
+```json
+{
+  "summary": {
+    "analysis": "Reviewed the changed update route, authentication middleware, object-level authorization path, repository scoping, and related request validation, focusing on attacker-controlled identifiers and ownership enforcement.",
+    "result": "No evidence-backed security vulnerability was identified in the reviewed scope. The changed request path preserves the existing authentication and ownership checks, and no concrete cross-tenant, injection, or trust-boundary regression was established.",
+    "implementation": "The reviewed security behavior is implemented primarily in `src/api/records.py`, the authorization helper used by the route, and the repository lookup that constrains record access."
+  }
+}
+```
+
+The orchestrator owns persistence and final rendering of the summary.
+
+---
+
 # Verification
 
 All specialist findings must initially use:
@@ -956,11 +1021,22 @@ Only report separately when the security consequence is independently meaningful
 
 Return JSON only.
 
+The specialist result must contain:
+
+- `specialist`
+- `summary`
+- `findings`
+
 Expected structure:
 
 ```json
 {
   "specialist": "security-review-specialist",
+  "summary": {
+    "analysis": "Reviewed the changed record-update route, authentication context, object-level authorization path, and repository scoping for attacker-controlled record identifiers.",
+    "result": "The review identified one evidence-backed authorization regression: the changed update path no longer enforces record ownership before invoking the privileged operation.",
+    "implementation": "The affected path is implemented in `src/api/records.py` and the directly related repository lookup used by the update service."
+  },
   "findings": [
     {
       "id": "SEC-001",
@@ -978,14 +1054,28 @@ Expected structure:
 }
 ```
 
-If no concrete vulnerability exists:
+If no concrete vulnerability exists, still return the three-paragraph summary:
 
 ```json
 {
   "specialist": "security-review-specialist",
+  "summary": {
+    "analysis": "Reviewed the changed security boundaries, authentication and authorization paths, untrusted-input handling, tenant scoping, and directly related security-sensitive context.",
+    "result": "No evidence-backed security vulnerability was identified within the reviewed scope.",
+    "implementation": "The reviewed security behavior is implemented in the changed routes, middleware, services, repositories, validation logic, configuration, and directly related components identified in the Pull Request."
+  },
   "findings": []
 }
 ```
+
+`summary.analysis`, `summary.result`, and `summary.implementation` are required
+even when `findings` is empty.
+
+All specialist findings must use:
+
+`verification_status: UNVERIFIED`
+
+The summary must describe only what this specialist actually reviewed.
 
 ---
 
@@ -1037,7 +1127,7 @@ categories.
 
 # Artifact Ownership
 
-Return findings to the orchestrator.
+Return the complete specialist result, including `summary` and `findings`, to the orchestrator.
 
 Do not write artifacts directly.
 
@@ -1072,6 +1162,8 @@ Do not:
 - report theoretical vulnerabilities without reachability
 - report pre-existing unrelated vulnerabilities
 - classify suspicious syntax alone as exploitable
+- invent summary content not supported by the reviewed evidence
+- claim routes, controls, attack paths, dependencies, configuration, or code locations in the summary that were not actually inspected
 - write artifacts directly
 - commit
 - push
@@ -1095,7 +1187,10 @@ The security review is complete when:
 - suspicious hypotheses were confirmed or discarded with minimal targeted reads
 - every HIGH or CRITICAL finding has a concrete reachable path
 - every reported finding has evidence-backed security impact
-- canonical findings JSON was returned to the orchestrator
+- the three required summary paragraphs were produced from reviewed evidence
+- the complete specialist JSON (`summary` + `findings`) was returned to the orchestrator
 
 If no evidence-backed security vulnerability exists, return an empty findings
-list.
+list together with the required three-paragraph specialist summary.
+
+````

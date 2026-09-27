@@ -1,0 +1,3 @@
+{
+  "summary": "The PR fixes an error by passing extracted YouTube content to the agent before searches. It adds a new function `format_research_context` in `formatting.py` to compact video context and updates several files to use this new context in search queries and state management. Tests are also updated to reflect these changes."
+}

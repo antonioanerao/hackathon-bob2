@@ -1,0 +1,35 @@
+{
+  "checked_files": 9,
+  "findings": [
+    {
+      "file": "src/agents/youtube_agent/agent.py",
+      "line": 3,
+      "code": "E501",
+      "message": "Line too long (84 > 79)"
+    },
+    {
+      "file": "tests/test_youtube_agent.py",
+      "line": 17,
+      "code": "E501",
+      "message": "Line too long (82 > 79)"
+    },
+    {
+      "file": "tests/test_youtube_agent.py",
+      "line": 26,
+      "code": "E501",
+      "message": "Line too long (81 > 79)"
+    },
+    {
+      "file": "tests/test_youtube_agent.py",
+      "line": 197,
+      "code": "E501",
+      "message": "Line too long (86 > 79)"
+    },
+    {
+      "file": "tests/test_youtube_agent.py",
+      "line": 205,
+      "code": "E501",
+      "message": "Line too long (83 > 79)"
+    }
+  ]
+}

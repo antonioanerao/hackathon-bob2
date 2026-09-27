@@ -1,3 +1,4 @@
+````
 ---
 name: api-review
 description: >
@@ -517,6 +518,65 @@ Do not increase severity because confidence is low.
 
 ---
 
+# Specialist Summary
+
+Every API review must return a concise specialist summary for direct inclusion
+in the final PR Guardian report.
+
+The summary must contain exactly three semantic paragraphs represented by the
+following fields:
+
+1. `analysis`
+   - explain what API behavior was reviewed
+   - identify the main routes, endpoints, schemas, serializers, handlers,
+     authentication/authorization paths, OpenAPI entries, or public contracts
+     actually inspected
+   - mention the relevant changed files or modules when available
+
+2. `result`
+   - explain what the API review concluded
+   - summarize whether concrete API findings were identified
+   - describe the main contract, validation, compatibility, HTTP semantic,
+     authentication, authorization, or specification impacts observed
+   - if no finding exists, explicitly state that no evidence-backed API defect
+     was identified within the reviewed scope
+
+3. `implementation`
+   - explain where the reviewed API behavior is implemented
+   - point to the most relevant changed files and code locations
+   - identify concrete routes, handlers, request/response models, serializers,
+     schemas, OpenAPI definitions, or directly related components when available
+
+The summary must:
+
+- be based only on evidence actually reviewed by this specialist
+- not invent files, routes, schemas, consumers, behavior, findings, or impact
+- not claim tests, runtime execution, verification, or scanner results that did
+  not occur
+- not duplicate the complete findings list
+- remain concise enough for direct inclusion in `review.md`
+- remain understandable without requiring the raw diff
+- use factual technical prose rather than generic review language
+
+If no concrete API defect exists, `result` must still describe the review
+outcome and state that no evidence-backed API finding was identified.
+
+Example:
+
+```json
+{
+  "summary": {
+    "analysis": "Reviewed the changed API route, request schema, response serialization, and related OpenAPI definition, focusing on contract compatibility, HTTP behavior, validation, and route-level authentication and authorization.",
+    "result": "No evidence-backed API defect was identified in the reviewed scope. The request and response contracts remain consistent with the implementation, and no concrete compatibility or HTTP semantic regression was found.",
+    "implementation": "The reviewed behavior is implemented primarily in `src/api/users.py` and the associated request/response schema definitions, with the public contract represented in the related OpenAPI specification."
+  }
+}
+```
+
+The orchestrator owns persistence and final rendering of the summary.
+
+---
+
 # Verification
 
 All specialist findings must initially use:
@@ -534,11 +594,22 @@ The finding verifier may later confirm or refute it.
 
 Return JSON only.
 
+The specialist result must contain:
+
+- `specialist`
+- `summary`
+- `findings`
+
 Expected structure:
 
 ```json
 {
   "specialist": "api-review-specialist",
+  "summary": {
+    "analysis": "Reviewed the changed user API request contract, response serialization, route behavior, and related specification entries.",
+    "result": "The review identified one evidence-backed compatibility regression: a previously optional request field is now required, which can reject previously valid client requests.",
+    "implementation": "The behavior is implemented in `src/api/users.py` and the directly related request schema used by the endpoint."
+  },
   "findings": [
     {
       "id": "API-001",
@@ -556,14 +627,28 @@ Expected structure:
 }
 ```
 
-If no concrete API defect exists:
+If no concrete API defect exists, still return the three-paragraph summary:
 
 ```json
 {
   "specialist": "api-review-specialist",
+  "summary": {
+    "analysis": "Reviewed the changed API routes, schemas, validation behavior, HTTP semantics, and directly related specification context.",
+    "result": "No evidence-backed API defect was identified within the reviewed scope.",
+    "implementation": "The reviewed API behavior is implemented in the changed route and schema files identified in the Pull Request."
+  },
   "findings": []
 }
 ```
+
+`summary.analysis`, `summary.result`, and `summary.implementation` are required
+even when `findings` is empty.
+
+All specialist findings must use:
+
+`verification_status: UNVERIFIED`
+
+The summary must describe only what this specialist actually reviewed.
 
 ---
 
@@ -609,7 +694,7 @@ categories.
 
 # Artifact Ownership
 
-Return findings to the orchestrator.
+Return the complete specialist result, including `summary` and `findings`, to the orchestrator.
 
 Do not write artifacts directly.
 
@@ -640,6 +725,8 @@ Do not:
 - report generic REST preferences as defects
 - report pre-existing issues unrelated to the PR
 - duplicate another specialist finding unless the API impact is materially distinct
+- invent summary content not supported by the reviewed evidence
+- claim code locations in the summary that were not actually inspected
 - write artifacts directly
 - commit
 - push
@@ -658,6 +745,9 @@ The API review is complete when:
 - OpenAPI consistency was checked when relevant
 - speculative hypotheses were confirmed or discarded where a targeted read was sufficient
 - every reported finding has concrete evidence
-- canonical findings JSON was returned to the orchestrator
+- the three required summary paragraphs were produced from reviewed evidence
+- the complete specialist JSON (`summary` + `findings`) was returned to the orchestrator
 
-If no evidence-backed API defect exists, return an empty findings list.
+If no evidence-backed API defect exists, return an empty findings list together with the required three-paragraph specialist summary.
+
+````

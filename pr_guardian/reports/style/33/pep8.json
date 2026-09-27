@@ -1,0 +1,17 @@
+{
+  "checked_files": 9,
+  "findings": [
+    {
+      "file": "src/auth/repository.py",
+      "line": 126,
+      "code": "E501",
+      "message": "Line too long (80 > 79)"
+    },
+    {
+      "file": "tests/test_auth_repository.py",
+      "line": 15,
+      "code": "E501",
+      "message": "Line too long (86 > 79)"
+    }
+  ]
+}

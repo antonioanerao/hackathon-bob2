@@ -1,3 +1,4 @@
+````
 ---
 name: finding-verification
 description: >
@@ -564,6 +565,8 @@ When previous verification results exist:
 
 One authoritative result should exist per `finding_id`.
 
+The verification summary must reflect the current authoritative results after merge.
+
 ---
 
 # Merge Behavior
@@ -581,17 +584,88 @@ Do not discard previous valid evidence without reason.
 
 ---
 
+# Verification Summary
+
+Every verifier execution must return a concise summary for direct inclusion in
+the final PR Guardian report.
+
+The summary must contain exactly three semantic paragraphs represented by the
+following fields:
+
+1. `analysis`
+   - explain which existing findings were selected for verification
+   - identify the verification hypotheses, evidence sources, code paths,
+     configuration, tests, dependencies, or other targeted artifacts actually
+     inspected
+   - mention relevant finding IDs and code locations when available
+
+2. `result`
+   - explain what the verification concluded
+   - summarize which findings were `VERIFIED`, `REFUTED`, `UNVERIFIED`,
+     `NOT_APPLICABLE`, or `VERIFICATION_FAILED`
+   - describe the practical evidentiary outcome without changing severity,
+     category, or finding meaning
+   - if no eligible findings existed, state that verification was not required
+
+3. `implementation`
+   - explain where the verified or refuted behavior is implemented
+   - point to the most relevant files, symbols, routes, configuration entries,
+     migrations, schemas, dependencies, or targeted tests actually used as
+     evidence
+   - when execution occurred, mention the targeted verification artifact or
+     command context without reproducing excessive output
+
+The summary must:
+
+- be based only on evidence actually inspected by the verifier
+- not create new findings
+- not reinterpret or rewrite specialist findings
+- not invent files, symbols, commands, exit codes, tests, runtime behavior,
+  package versions, CVEs, or verification outcomes
+- not claim a finding was verified or refuted without positive evidence
+- not duplicate the complete per-finding verification results
+- remain concise enough for direct inclusion in `review.md`
+- remain understandable without requiring the raw verification artifact
+- use factual technical prose rather than generic verification language
+
+Example:
+
+```json
+{
+  "summary": {
+    "analysis": "Verified findings `SEC-001` and `CODE-002` using the existing specialist evidence, the changed route and service code, and one targeted code-path inspection. No broad repository scan or full test suite was executed.",
+    "result": "`SEC-001` was VERIFIED because the changed request path reaches the protected update without the required authorization check. `CODE-002` remained UNVERIFIED because the relevant runtime condition could not be established safely from the available static evidence.",
+    "implementation": "The evidence for `SEC-001` is implemented in `src/api/orders.py` and the directly called update service. The unresolved behavior for `CODE-002` is located in `src/services/order_processor.py`, where additional runtime evidence would be required."
+  }
+}
+```
+
+The orchestrator owns final rendering of the summary.
+
+---
+
 # Output Contract
 
 Write:
 
 `reports/verification/<pr-id>/verification-results.json`
 
+The artifact must contain:
+
+- `pr_id`
+- `summary`
+- `results`
+
 Recommended structure:
 
 ```json
 {
   "pr_id": 42,
+  "summary": {
+    "analysis": "Verified the selected high-priority findings using existing specialist evidence and targeted code-path inspection.",
+    "result": "One finding was VERIFIED and one remained UNVERIFIED because the required runtime condition could not be established from the available evidence.",
+    "implementation": "Verification evidence was taken from the changed route, service implementation, and directly related configuration referenced by the original findings."
+  },
   "results": [
     {
       "finding_id": "SEC-001",
@@ -605,6 +679,25 @@ Recommended structure:
   ]
 }
 ```
+
+If no eligible findings exist, still return a summary:
+
+```json
+{
+  "pr_id": 42,
+  "summary": {
+    "analysis": "No findings were eligible for verification in this run.",
+    "result": "Verification was not required because no unresolved eligible findings were selected.",
+    "implementation": "No code path, configuration, dependency, or test artifact required additional verification."
+  },
+  "results": []
+}
+```
+
+`summary.analysis`, `summary.result`, and `summary.implementation` are required
+for every verifier execution, including no-op runs.
+
+The summary must describe only verification work that actually occurred.
 
 ---
 
@@ -763,6 +856,8 @@ Do not:
 - claim verification without concrete evidence
 - treat missing evidence as refutation
 - overwrite resolved verification without explicit targeting
+- invent verification summary content not supported by actual evidence
+- claim files, code paths, commands, tests, or implementation locations in the summary that were not actually inspected
 - commit
 - push
 - merge
@@ -783,8 +878,15 @@ Verification is complete when every finding in the batch has:
 
 and:
 
+- the three required verification summary paragraphs were produced from actual verification evidence
+- the summary accurately reflects the current merged verification results
+
+and:
+
 `reports/verification/<pr-id>/verification-results.json`
 
 has been successfully written or updated.
 
-If no eligible findings exist, return a concise no-op result and do not invent verification work.
+If no eligible findings exist, return a concise no-op result with the required three-paragraph verification summary and do not invent verification work.
+
+````

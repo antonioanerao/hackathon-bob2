@@ -1,0 +1,9 @@
+{
+  "specialist": "code-review-specialist",
+  "summary": {
+    "analysis": "Reviewed the changes related to adding application identification and tokens in the request. Specifically, inspected the modifications in `README.md`, `src/auth/models.py`, `src/auth/repository.py`, `src/jobs.py`, `src/main.py`, `src/schemas/__init__.py`, `src/schemas/api.py`, `tests/test_analyze_attachments.py`, `tests/test_auth_repository.py`, and `tests/test_qdrant_queue.py`. The review focused on the new fields and logic introduced for handling application identification and tokens.",
+    "result": "No evidence-backed behavioral defect was identified within the reviewed scope. The changes appear to be correctly implemented and do not introduce any apparent regressions or correctness issues.",
+    "implementation": "The reviewed behavior is implemented in the modified files, particularly in `src/auth/models.py`, `src/auth/repository.py`, `src/main.py`, and `src/schemas/api.py`. The new fields and logic are exercised by the added and modified tests in `tests/test_analyze_attachments.py`, `tests/test_auth_repository.py`, and `tests/test_qdrant_queue.py`."
+  },
+  "findings": []
+}

@@ -1,3 +1,4 @@
+````
 ---
 name: database-review
 description: >
@@ -634,6 +635,67 @@ Do not increase severity based on unknown production scale.
 
 ---
 
+# Specialist Summary
+
+Every database review must return a concise specialist summary for direct
+inclusion in the final PR Guardian report.
+
+The summary must contain exactly three semantic paragraphs represented by the
+following fields:
+
+1. `analysis`
+   - explain what persistence behavior was reviewed
+   - identify the main migrations, schema definitions, ORM models, repositories,
+     queries, transactions, indexes, constraints, or deployment interactions
+     actually inspected
+   - mention relevant changed files, models, tables, or modules when available
+
+2. `result`
+   - explain what the database review concluded
+   - summarize whether concrete persistence findings were identified
+   - describe the main schema, migration, integrity, transaction, query,
+     indexing, availability, or deployment impacts observed
+   - if no finding exists, explicitly state that no evidence-backed database
+     defect was identified within the reviewed scope
+
+3. `implementation`
+   - explain where the reviewed persistence behavior is implemented
+   - point to the most relevant changed files and code locations
+   - identify concrete migrations, ORM models, repository methods, SQL queries,
+     constraints, indexes, transaction wrappers, or schema definitions when
+     available
+
+The summary must:
+
+- be based only on evidence actually reviewed by this specialist
+- not invent tables, columns, models, migrations, constraints, indexes, query
+  behavior, production data, findings, or impact
+- not claim migrations, queries, tests, runtime execution, verification,
+  database access, or query plans that did not occur
+- not duplicate the complete findings list
+- remain concise enough for direct inclusion in `review.md`
+- remain understandable without requiring the raw diff
+- use factual technical prose rather than generic database commentary
+
+If no concrete database defect exists, `result` must still describe the review
+outcome and state that no evidence-backed database finding was identified.
+
+Example:
+
+```json
+{
+  "summary": {
+    "analysis": "Reviewed the changed migration, ORM model, repository query, and transaction boundary, focusing on schema compatibility, referential integrity, query correctness, and deployment safety.",
+    "result": "No evidence-backed database defect was identified in the reviewed scope. The migration and ORM mapping remain consistent, and no concrete transaction, query, or referential-integrity regression was established.",
+    "implementation": "The reviewed persistence behavior is implemented primarily in `migrations/20260926_add_tenant_id.py`, the related ORM model, and the repository method that reads and writes the affected records."
+  }
+}
+```
+
+The orchestrator owns persistence and final rendering of the summary.
+
+---
+
 # Verification
 
 All specialist findings must initially use:
@@ -659,11 +721,22 @@ evidence.
 
 Return JSON only.
 
+The specialist result must contain:
+
+- `specialist`
+- `summary`
+- `findings`
+
 Expected structure:
 
 ```json
 {
   "specialist": "database-review-specialist",
+  "summary": {
+    "analysis": "Reviewed the changed migration, affected ORM model, repository persistence path, and transaction behavior related to the new tenant field.",
+    "result": "The review identified one evidence-backed migration risk: a new non-nullable column is introduced without a default or backfill path for existing rows.",
+    "implementation": "The schema change is implemented in `migrations/20260926_add_tenant_id.py`, with corresponding persistence behavior in the related ORM model and repository code."
+  },
   "findings": [
     {
       "id": "DB-001",
@@ -681,14 +754,28 @@ Expected structure:
 }
 ```
 
-If no concrete database defect exists:
+If no concrete database defect exists, still return the three-paragraph summary:
 
 ```json
 {
   "specialist": "database-review-specialist",
+  "summary": {
+    "analysis": "Reviewed the changed persistence paths, schema or migration definitions, ORM mappings, queries, transactions, and directly related database context.",
+    "result": "No evidence-backed database defect was identified within the reviewed scope.",
+    "implementation": "The reviewed persistence behavior is implemented in the changed migrations, models, repositories, queries, and directly related persistence components identified in the Pull Request."
+  },
   "findings": []
 }
 ```
+
+`summary.analysis`, `summary.result`, and `summary.implementation` are required
+even when `findings` is empty.
+
+All specialist findings must use:
+
+`verification_status: UNVERIFIED`
+
+The summary must describe only what this specialist actually reviewed.
 
 ---
 
@@ -737,7 +824,7 @@ categories apply.
 
 # Artifact Ownership
 
-Return findings to the orchestrator.
+Return the complete specialist result, including `summary` and `findings`, to the orchestrator.
 
 Do not write artifacts directly.
 
@@ -770,6 +857,8 @@ Do not:
 - fabricate query plans
 - report pre-existing database issues as introduced
 - report generic performance advice without evidence
+- invent summary content not supported by the reviewed evidence
+- claim tables, models, migrations, queries, or code locations in the summary that were not actually inspected
 - write artifacts directly
 - commit
 - push
@@ -790,6 +879,9 @@ The database review is complete when:
 - referential integrity was checked where applicable
 - speculative hypotheses were confirmed or discarded when one targeted read was sufficient
 - every reported finding contains concrete persistence evidence
-- canonical findings JSON was returned to the orchestrator
+- the three required summary paragraphs were produced from reviewed evidence
+- the complete specialist JSON (`summary` + `findings`) was returned to the orchestrator
 
-If no evidence-backed database defect exists, return an empty findings list.
+If no evidence-backed database defect exists, return an empty findings list together with the required three-paragraph specialist summary.
+
+````

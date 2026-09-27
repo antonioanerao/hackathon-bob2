@@ -1,3 +1,4 @@
+````
 ---
 name: pr-guardian-review
 description: >
@@ -32,6 +33,7 @@ The pipeline must:
 - preserve specialist independence
 - verify only findings that justify additional proof
 - persist all required artifacts
+- preserve each specialist's three-paragraph review summary
 - synthesize the final result deterministically
 
 The review must optimize for trustworthy evidence, not finding volume.
@@ -54,15 +56,17 @@ The model performs reasoning.
 
 The runtime controls:
 
-- routing
-- validation
+- routing validation
 - reviewer registry
-- budgets
+- execution-planning metadata
 - artifact paths
 - persistence
 - verification eligibility
 - final classification
 - execution boundaries
+
+Reviewer selection itself is domain-driven: every materially relevant registered
+specialist selected by triage must be allowed to run.
 
 ---
 
@@ -231,8 +235,8 @@ Triage may only select reviewers that exist in this registry.
 - identifying affected domains
 - identifying risk triggers
 - assigning risk level
-- selecting reviewers
-- defining the agent budget
+- selecting every materially relevant reviewer
+- explaining reviewer selection
 - identifying obvious fast-path conditions
 
 It must not:
@@ -249,10 +253,13 @@ It must not:
 The review plan should contain:
 
 - `risk_level`
-- `agent_budget`
 - `risk_triggers`
 - `selected_reviewers`
 - `skipped_reviewers`
+- `reviewer_reasons`
+
+The runtime may add execution-planning metadata derived from `risk_level`, but
+must not impose a hard reviewer-count ceiling.
 
 Valid risk levels:
 
@@ -270,11 +277,11 @@ Before using the triage output, validate:
 
 - response is valid JSON
 - `risk_level` is valid
-- budget values are valid integers
 - selected reviewers are known
 - skipped reviewers are known
-- selected reviewers do not exceed budget
+- reviewer reasons are well-formed when present
 - selected and skipped reviewers do not conflict
+- every selected reviewer exists in the runtime registry
 
 Reject:
 
@@ -298,23 +305,36 @@ The review plan becomes the authoritative routing artifact for the rest of the r
 
 ---
 
-# Agent Budget
+# Execution Planning
 
-Default maximum budget:
+Risk level may be used for execution-planning metadata, but it must not create a
+hard reviewer-count limit.
 
-| Risk | Max Reviewers | Max Verifiers |
+Recommended advisory metadata:
+
+| Risk | Typical Reviewers | Max Verifiers |
 |---|---:|---:|
 | `TRIVIAL` | 0 | 0 |
-| `LOW` | 1 | 0 |
-| `MEDIUM` | 2 | 1 |
-| `HIGH` | 3 | 1 |
-| `CRITICAL` | 4 | 1 |
+| `LOW` | 1 or more when multiple domains are genuinely affected | 0 |
+| `MEDIUM` | 1–3 depending on affected domains | 1 |
+| `HIGH` | all materially relevant reviewers | 1 |
+| `CRITICAL` | all materially relevant reviewers | 1 |
 
-The budget is a ceiling.
+`Typical Reviewers` is guidance only.
 
-It is not a target.
+The runtime MUST NOT reject, truncate, or reorder away a materially relevant
+selected reviewer merely because the reviewer count exceeds a risk-based
+expectation.
 
-Do not execute extra reviewers merely because capacity remains.
+If triage selects:
+
+- one relevant specialist → run one
+- two relevant specialists → run both
+- all configured specialists as materially relevant → run all of them
+
+Do not execute unrelated reviewers merely because they are available.
+
+Verification capacity remains independently controlled by the runtime.
 
 ---
 
@@ -339,7 +359,7 @@ Expected behavior:
 
 Flow:
 
-`context → triage → max 1 reviewer → synthesis`
+`context → triage → all selected relevant reviewers → synthesis`
 
 Verification is normally skipped.
 
@@ -347,9 +367,11 @@ Verification is normally skipped.
 
 ## MEDIUM / HIGH / CRITICAL
 
-Follow the validated review plan and budget.
+Follow the validated review plan.
 
-Do not automatically use the maximum reviewer count.
+Run every materially relevant selected reviewer.
+
+Do not add unrelated reviewers merely because the risk level is high.
 
 ---
 
@@ -484,22 +506,42 @@ Specialists and verifier are delegated execution roles.
 
 # Specialist Output Contract
 
-Each specialist must return canonical JSON.
+Each specialist must return canonical JSON containing:
 
-Example:
+- `specialist`
+- `summary`
+- `findings`
+
+The summary must contain exactly:
+
+- `analysis`
+- `result`
+- `implementation`
+
+Example with no findings:
 
 ```json
 {
   "specialist": "code-review-specialist",
+  "summary": {
+    "analysis": "Reviewed the changed application logic, control flow, state handling, and directly related behavioral context.",
+    "result": "No evidence-backed behavioral defect was identified within the reviewed scope.",
+    "implementation": "The reviewed behavior is implemented in the changed functions and directly related components identified in the Pull Request."
+  },
   "findings": []
 }
 ```
 
-With findings:
+Example with findings:
 
 ```json
 {
   "specialist": "code-review-specialist",
+  "summary": {
+    "analysis": "Reviewed the changed state transition and directly related error-handling path.",
+    "result": "The review identified one evidence-backed state regression affecting the changed workflow.",
+    "implementation": "The affected behavior is implemented in `src/service.py` inside the changed update path."
+  },
   "findings": [
     {
       "id": "CODE-001",
@@ -517,6 +559,11 @@ With findings:
 }
 ```
 
+The specialist summary is authored by the specialist that performed the review.
+
+The final report stage must render it deterministically and must not ask another
+model to rewrite or reinterpret it.
+
 ---
 
 # Specialist Output Validation
@@ -527,12 +574,17 @@ Validate:
 
 - JSON object
 - expected specialist identity
+- `summary` object
+- non-empty `summary.analysis`
+- non-empty `summary.result`
+- non-empty `summary.implementation`
 - findings list
 - required finding fields
 - severity enum
 - verification status
 - finding ID format
 - file reference plausibility
+- summary claims are structurally valid strings
 - no model-selected output path
 
 Reject malformed results.
@@ -558,20 +610,25 @@ Do not report:
 - speculative performance concerns
 - pre-existing unrelated defects
 
-If no defect exists, the specialist must return:
+If no defect exists, the specialist must still return its three-paragraph summary:
 
 ```json
 {
   "specialist": "<specialist>",
+  "summary": {
+    "analysis": "What the specialist actually reviewed.",
+    "result": "No evidence-backed defect was identified within the reviewed scope.",
+    "implementation": "Where the reviewed behavior is implemented."
+  },
   "findings": []
 }
 ```
 
 ---
 
-# Stage 9 — Persist Specialist Findings
+# Stage 9 — Persist Specialist Results
 
-The orchestrator persists each successful specialist result under:
+The orchestrator persists each complete successful specialist result, including `summary` and `findings`, under:
 
 `reports/findings/<pr-id>/<specialist>.json`
 
@@ -619,7 +676,7 @@ If a specialist cannot prove a suspected issue because execution or another capa
 
 Invoke `finding-verifier` only when both conditions hold:
 
-1. verifier budget > 0
+1. runtime verification policy allows a verifier invocation
 2. at least one eligible finding exists
 
 Default eligible severities:
@@ -671,7 +728,14 @@ If verification runs, persist:
 
 `reports/verification/<pr-id>/verification-results.json`
 
-Each result should contain:
+The verification artifact should contain:
+
+- `summary.analysis`
+- `summary.result`
+- `summary.implementation`
+- `results`
+
+Each verification result should contain:
 
 - `finding_id`
 - `status`
@@ -727,14 +791,17 @@ Final synthesis is deterministic.
 
 The orchestrator/runtime must:
 
-1. load persisted findings
-2. apply verification results
-3. remove inactive findings
-4. deduplicate by root cause
-5. classify findings
-6. generate final reports
+1. load persisted specialist summaries and findings
+2. validate and preserve specialist summaries
+3. apply verification results and verification summary
+4. remove inactive findings
+5. deduplicate findings by root cause
+6. classify findings
+7. generate final reports deterministically
 
 Do not perform another general LLM review pass during synthesis.
+
+Do not ask an LLM to rewrite specialist or verification summaries.
 
 ---
 
@@ -864,6 +931,7 @@ Recommended top-level structure:
 - `risk_triggers`
 - `selected_reviewers`
 - `skipped_reviewers`
+- `specialist_reviews`
 - `summary`
 - `blocking`
 - `advisory`
@@ -893,6 +961,22 @@ Review Status
 
 ## Risk Triggers
 
+## Specialist Reviews
+
+### <Specialist Display Name>
+
+**Analysis**
+
+<stored summary.analysis>
+
+**Result**
+
+<stored summary.result>
+
+**Implementation**
+
+<stored summary.implementation>
+
 ## Blocking Findings
 
 ## Advisory Findings
@@ -907,6 +991,34 @@ Review Status
 ```
 
 Do not embellish stored evidence.
+
+For every successfully completed selected specialist, render exactly one
+subsection under `## Specialist Reviews`.
+
+Recommended display-name mapping:
+
+- `code-review-specialist` → `Code Review`
+- `security-review-specialist` → `Security Review`
+- `database-review-specialist` → `Database Review`
+- `api-review-specialist` → `API Review`
+- `architecture-review-specialist` → `Architecture Review`
+- `async-review-specialist` → `Async / Queue Review`
+
+Each subsection must render the persisted specialist fields exactly as report
+content:
+
+- `summary.analysis`
+- `summary.result`
+- `summary.implementation`
+
+Do not regenerate, merge, paraphrase, or infer specialist summaries during
+synthesis.
+
+If a selected specialist failed, do not fabricate a summary for it. Preserve the
+failure in `Execution Notes` and mark the run `PARTIAL` when appropriate.
+
+If verification ran, render its persisted three-paragraph summary under the
+`Verification` section before per-finding verification details.
 
 ---
 
@@ -993,6 +1105,8 @@ Never directly trust model-provided:
 - reviewer identifiers
 - severity
 - status
+- specialist summaries
+- verification summaries
 - file paths
 - commands
 - tool results
@@ -1035,6 +1149,7 @@ Do not:
 
 - preload specialist skills
 - spawn unselected reviewers
+- truncate selected reviewers because of a risk-based reviewer-count expectation
 - rediscover PR metadata after successful collection
 - reload identical PR diff unnecessarily
 - give specialists each other's findings
@@ -1050,6 +1165,9 @@ Do not:
 - fabricate tool output
 - change finding severity during verification
 - create findings during synthesis
+- regenerate specialist summaries during synthesis
+- rewrite specialist summaries with another model pass
+- fabricate specialist or verification summaries
 - modify production code
 - commit
 - push
@@ -1067,10 +1185,13 @@ A run is successful only when:
 - review plan exists
 - routing is valid
 - all successful selected specialists returned valid results
-- specialist findings were persisted
+- every successful selected specialist returned a valid three-paragraph summary
+- complete specialist results (`summary` + `findings`) were persisted
 - specialist failures were explicitly recorded
 - verification completed or was explicitly skipped
 - synthesis completed
+- specialist summaries were rendered in `review.md`
+- verification summary was rendered when verification ran
 - `review.json` exists
 - `review.md` exists
 - `run-manifest.json` exists
@@ -1131,3 +1252,5 @@ reports/runs/42/run-manifest.json
 Then display:
 
 `reports/reviews/<pr-id>/review.md`
+
+````

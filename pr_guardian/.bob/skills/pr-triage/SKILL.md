@@ -1,3 +1,4 @@
+````
 ---
 name: pr-triage
 description: >
@@ -20,7 +21,7 @@ The triage stage determines:
 - overall review risk
 - which specialist reviewers are justified
 - which reviewers can be skipped
-- the maximum reviewer and verifier budget
+- concise reviewer-selection reasons
 
 Triage is a routing stage.
 
@@ -38,11 +39,11 @@ It must not create findings.
 
 > Explore only when evidence requires it.
 
-> Budget is a ceiling, not a target.
+> Reviewer selection is driven by affected domains, not by a hard reviewer-count ceiling.
 
 > Route reviewers because of evidence, not because they are available.
 
-The triage stage should produce the smallest safe review plan.
+The triage stage should produce the smallest complete review plan: select every specialist that is materially relevant while avoiding unrelated reviewers.
 
 ---
 
@@ -114,7 +115,7 @@ Determine, with minimum exploration:
 4. relevant risk triggers
 5. risk level
 6. reviewer routing
-7. agent budget
+7. reviewer-selection reasons
 
 The output must be sufficient for the orchestrator to continue without
 re-performing triage.
@@ -348,21 +349,24 @@ Valid risk levels:
 
 Risk should reflect review exposure, not predicted defect count.
 
+Risk level and reviewer count are related but independent. A LOW or MEDIUM PR may still require multiple reviewers when multiple review domains are genuinely affected.
+
 ---
 
 # Risk Table
 
-| Risk | Typical Scope | Max Reviewers | Max Verifiers |
+| Risk | Typical Scope | Typical Reviewers | Max Verifiers |
 |---|---|---:|---:|
 | `TRIVIAL` | docs, comments, metadata, non-behavioral change | 0 | 0 |
-| `LOW` | small isolated behavioral change with limited blast radius | 1 | 0 |
-| `MEDIUM` | bounded functional change affecting one or more components | 2 | 1 |
-| `HIGH` | auth, database, public API, queues, sensitive inputs, dependency or security boundary | 3 | 1 |
-| `CRITICAL` | high-impact auth, tenant isolation, cryptography, destructive data, or severe integrity boundary change | 4 | 1 |
+| `LOW` | small isolated behavioral change with limited blast radius | 1 or more when multiple domains are genuinely affected | 0 |
+| `MEDIUM` | bounded functional change affecting one or more components | 1–3 depending on affected domains | 1 |
+| `HIGH` | auth, database, public API, queues, sensitive inputs, dependency or security boundary | all materially relevant reviewers | 1 |
+| `CRITICAL` | high-impact auth, tenant isolation, cryptography, destructive data, or severe integrity boundary change | all materially relevant reviewers | 1 |
 
-The budget is a maximum.
+Reviewer counts are guidance only, not execution limits.
 
-Do not automatically assign the maximum number of reviewers.
+Select every specialist that is materially relevant to the PR. Do not omit a
+relevant reviewer merely to satisfy a risk-based count.
 
 ---
 
@@ -380,7 +384,27 @@ Examples:
 
 Do not use `TRIVIAL` if executable behavior changes.
 
-Expected reviewer budget:
+## Executable Change Guard
+
+`TRIVIAL` MUST NOT be selected when the PR changes executable source files
+unless the changes are demonstrably non-behavioral.
+
+Examples that are NOT TRIVIAL:
+
+- adding or removing application fields
+- changing prompts consumed at runtime
+- modifying functions, classes, models, schemas, or runtime constants
+- changing serialization or output structures
+- adding behavior-specific tests
+- changing request/response/internal data contracts
+
+When executable source files change and behavior may be affected, the minimum
+risk level is `LOW`.
+
+When behavior or data structures span multiple directly related components,
+prefer `MEDIUM` when the broader review surface justifies it.
+
+Typical execution profile:
 
 ```json
 {
@@ -402,7 +426,7 @@ Examples:
 - small deterministic bug fix
 - isolated non-sensitive logic adjustment
 
-Expected maximum:
+Typical execution profile:
 
 ```json
 {
@@ -425,7 +449,7 @@ Examples:
 - moderate refactor with behavior implications
 - concurrency-sensitive internal change with limited exposure
 
-Maximum:
+Typical execution profile:
 
 ```json
 {
@@ -455,7 +479,7 @@ Examples:
 - untrusted input processing
 - significant concurrency behavior
 
-Maximum:
+Typical execution profile:
 
 ```json
 {
@@ -485,7 +509,7 @@ Examples:
 - high-impact data integrity controls
 - security-critical trust boundary redesign
 
-Maximum:
+Typical execution profile:
 
 ```json
 {
@@ -754,6 +778,10 @@ Async review may also be appropriate when queue workers are involved.
 
 Select only relevant specialists.
 
+Select every specialist that is materially relevant to the PR.
+
+Do not omit a relevant reviewer merely because another reviewer was already selected or because the risk level usually implies fewer reviewers.
+
 Available routing domains:
 
 - `code-review-specialist`
@@ -868,8 +896,9 @@ The structural effect must be meaningful.
 
 # Multiple Reviewers
 
-Select multiple specialists only when the PR spans materially distinct review
-domains.
+Select multiple specialists whenever the PR spans materially distinct review domains.
+
+Do not suppress a relevant specialist because another reviewer is already selected.
 
 Example:
 
@@ -879,16 +908,17 @@ A public endpoint that writes through a new database migration may justify:
 - `database-review-specialist`
 - `code-review-specialist`
 
-If authorization also changes, security review may outrank a lower-value
-specialist within the budget.
+If authorization also changes, add `security-review-specialist` as well. Relevant specialists are additive; they are not mutually exclusive.
 
 ---
 
-# Reviewer Priority
+# Reviewer Execution Order
 
-If justified reviewers exceed the available budget, prioritize by actual risk.
+Reviewer priority may be used only to determine execution order when useful.
 
-Default tie-break order:
+It must not be used to drop or truncate materially relevant reviewers.
+
+Default execution order:
 
 1. `code-review-specialist`
 2. `security-review-specialist`
@@ -897,15 +927,14 @@ Default tie-break order:
 5. `async-review-specialist`
 6. `architecture-review-specialist`
 
-This ordering is only a tie-break rule.
-
-Concrete PR risk should determine priority first.
+Concrete PR risk may justify a different order.
 
 Example:
 
-A pure authentication PR should prioritize security over generic code review.
+A pure authentication PR may run `security-review-specialist` before generic
+code review.
 
-Do not mechanically apply the ordering when domain risk clearly differs.
+All materially relevant selected reviewers still run.
 
 ---
 
@@ -917,8 +946,8 @@ Typical reasons:
 
 - domain not affected
 - insufficient evidence
-- reviewer budget exceeded
-- lower-priority overlap
+- domain not materially affected
+- insufficient evidence to justify specialist review
 - trivial change
 - no behavioral change
 
@@ -928,22 +957,50 @@ Do not fabricate review activity for skipped reviewers.
 
 ---
 
-# Agent Budget
+# Execution Planning Metadata
 
-The output must define a budget compatible with the selected risk level.
+The triage model does not define a hard reviewer-count budget.
 
-Recommended structure:
+The runtime may derive execution-planning metadata from `risk_level`, for
+example:
 
 ```json
 {
-  "max_reviewers": 2,
-  "max_verifiers": 1
+  "TRIVIAL": {
+    "expected_reviewers": 0,
+    "max_verifiers": 0
+  },
+  "LOW": {
+    "expected_reviewers": 1,
+    "max_verifiers": 0
+  },
+  "MEDIUM": {
+    "expected_reviewers": 2,
+    "max_verifiers": 1
+  },
+  "HIGH": {
+    "expected_reviewers": 3,
+    "max_verifiers": 1
+  },
+  "CRITICAL": {
+    "expected_reviewers": 4,
+    "max_verifiers": 1
+  }
 }
 ```
 
-Budget must not exceed the configured maximum for the assigned risk level.
+`expected_reviewers` is advisory only.
 
-The orchestrator should validate the budget deterministically.
+The runtime MUST NOT reject or truncate `selected_reviewers` because the number
+of materially relevant reviewers exceeds `expected_reviewers`.
+
+Reviewer selection is domain-driven:
+
+- if one specialist is relevant, run one
+- if two specialists are relevant, run both
+- if all configured specialists are materially relevant, run all of them
+
+The verifier limit remains independently controlled by the runtime.
 
 ---
 
@@ -1013,49 +1070,65 @@ Omit empty optional collections when the schema allows.
 
 # review-plan.json
 
-Required fields:
+Required fields returned by triage:
 
 - `risk_level`
-- `agent_budget`
 - `risk_triggers`
 - `selected_reviewers`
 - `skipped_reviewers`
+- `reviewer_reasons`
 
-Recommended structure:
+The runtime may add:
+
+- execution-planning metadata derived from `risk_level`
+- verifier limits
+
+`selected_reviewers` and `skipped_reviewers` MUST contain reviewer-name strings
+only.
+
+Correct:
 
 ```json
 {
   "risk_level": "HIGH",
-  "agent_budget": {
-    "max_reviewers": 3,
-    "max_verifiers": 1
-  },
   "risk_triggers": [
     "PUBLIC_API_CHANGED",
     "AUTHORIZATION_CHANGED"
   ],
   "selected_reviewers": [
-    {
-      "reviewer": "security-review-specialist",
-      "reason": "Authorization behavior changed on a public update endpoint."
-    },
-    {
-      "reviewer": "api-review-specialist",
-      "reason": "The public endpoint request contract changed."
-    }
+    "security-review-specialist",
+    "api-review-specialist"
   ],
   "skipped_reviewers": [
+    "database-review-specialist"
+  ],
+  "reviewer_reasons": {
+    "security-review-specialist": "Authorization behavior changed on a public update endpoint.",
+    "api-review-specialist": "The public endpoint request contract changed.",
+    "database-review-specialist": "No schema, query, migration, or transaction change is present."
+  }
+}
+```
+
+Incorrect:
+
+```json
+{
+  "selected_reviewers": [
     {
-      "reviewer": "database-review-specialist",
-      "reason": "No schema, query, migration, or transaction change is present."
+      "reviewer": "security-review-specialist",
+      "reason": "Authorization behavior changed."
     }
   ]
 }
 ```
 
-If the runtime expects reviewer names as plain arrays, preserve that schema.
+Do not return reviewer objects inside `selected_reviewers` or
+`skipped_reviewers`.
 
-Do not change the orchestrator's canonical schema arbitrarily.
+Do not return a hard reviewer-count budget.
+
+The runtime expects reviewer identifiers as plain strings.
 
 ---
 
@@ -1133,7 +1206,7 @@ The only analytical outputs are:
 - triggers
 - reviewer selection
 - reviewer skip decisions
-- budget
+- reviewer reasons
 
 ---
 
@@ -1197,7 +1270,8 @@ Do not:
 - invent dependency vulnerabilities
 - invent CVEs
 - infer security defects from filenames alone
-- use the full reviewer budget unnecessarily
+- omit a materially relevant reviewer merely to reduce reviewer count
+- return or override a hard reviewer-count budget
 - modify production code
 - commit
 - push
@@ -1215,10 +1289,12 @@ Triage is complete when:
 - impact map contains only routing-relevant information
 - supported risk triggers are identified
 - one valid risk level is assigned
-- agent budget is within allowed limits
 - selected reviewers are justified and registered
+- all materially relevant reviewers are selected, even when more than one is required
 - skipped reviewers are accounted for where useful
 - no specialist review has been performed
 - the result is ready for orchestrator validation and persistence
 
 At that point, return control to the orchestrator.
+
+````

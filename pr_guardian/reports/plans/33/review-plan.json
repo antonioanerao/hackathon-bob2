@@ -1,0 +1,31 @@
+{
+  "risk_level": "MEDIUM",
+  "risk_triggers": [
+    "AUTHENTICATION_CHANGED",
+    "PUBLIC_API_CHANGED"
+  ],
+  "selected_reviewers": [
+    "security-review-specialist",
+    "api-review-specialist",
+    "code-review-specialist"
+  ],
+  "skipped_reviewers": [
+    "architecture-review-specialist",
+    "async-review-specialist",
+    "database-review-specialist",
+    "performance-review-specialist"
+  ],
+  "reviewer_reasons": {
+    "security-review-specialist": "Authentication behavior changed in the auth models and repository.",
+    "api-review-specialist": "Public API request contract changed with new schemas and endpoint modifications.",
+    "code-review-specialist": "Executable source code changes affecting multiple files with behavior implications.",
+    "architecture-review-specialist": "No significant architectural changes detected.",
+    "async-review-specialist": "No changes related to background jobs or queue processing.",
+    "database-review-specialist": "No schema, query, migration, or transaction changes detected.",
+    "performance-review-specialist": "No performance-related changes detected."
+  },
+  "execution_planning": {
+    "expected_reviewers": 2,
+    "max_verifiers": 1
+  }
+}

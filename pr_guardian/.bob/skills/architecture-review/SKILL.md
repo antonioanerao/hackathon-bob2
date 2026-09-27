@@ -1,3 +1,4 @@
+````
 ---
 name: architecture-review
 description: >
@@ -499,6 +500,68 @@ Do not increase severity merely because the architecture is undesirable.
 
 ---
 
+# Specialist Summary
+
+Every architecture review must return a concise specialist summary for direct
+inclusion in the final PR Guardian report.
+
+The summary must contain exactly three semantic paragraphs represented by the
+following fields:
+
+1. `analysis`
+   - explain what structural or architectural behavior was reviewed
+   - identify the main modules, packages, layers, dependency relationships,
+     abstractions, initialization paths, composition points, or boundaries
+     actually inspected
+   - mention the relevant changed files or modules when available
+
+2. `result`
+   - explain what the architecture review concluded
+   - summarize whether concrete architectural findings were identified
+   - describe the main dependency, boundary, coupling, cohesion, ownership,
+     initialization, or module-isolation impacts observed
+   - if no finding exists, explicitly state that no evidence-backed
+     architectural regression was identified within the reviewed scope
+
+3. `implementation`
+   - explain where the reviewed architecture is implemented
+   - point to the most relevant changed files and code locations
+   - identify concrete modules, packages, classes, abstractions, dependency
+     injection registrations, composition roots, imports, or initialization
+     points when available
+
+The summary must:
+
+- be based only on evidence actually reviewed by this specialist
+- not invent modules, dependencies, boundaries, cycles, abstractions, runtime
+  behavior, findings, or impact
+- not claim tests, runtime execution, verification, or scanner results that did
+  not occur
+- not duplicate the complete findings list
+- remain concise enough for direct inclusion in `review.md`
+- remain understandable without requiring the raw diff
+- use factual technical prose rather than generic architecture commentary
+
+If no concrete architectural regression exists, `result` must still describe
+the review outcome and state that no evidence-backed architectural finding was
+identified.
+
+Example:
+
+```json
+{
+  "summary": {
+    "analysis": "Reviewed the changed service composition, module dependencies, repository abstraction usage, and initialization wiring, focusing on dependency direction, module boundaries, and responsibility ownership.",
+    "result": "No evidence-backed architectural regression was identified in the reviewed scope. The changed components preserve the existing dependency direction and do not introduce a concrete boundary violation, dependency cycle, or responsibility leak.",
+    "implementation": "The reviewed structure is implemented primarily in `src/application/order_service.py`, the repository abstraction under `src/domain/`, and the dependency bindings in the application composition layer."
+  }
+}
+```
+
+The orchestrator owns persistence and final rendering of the summary.
+
+---
+
 # Verification
 
 All specialist findings must initially use:
@@ -516,11 +579,22 @@ The finding verifier may later confirm or refute it.
 
 Return JSON only.
 
+The specialist result must contain:
+
+- `specialist`
+- `summary`
+- `findings`
+
 Expected structure:
 
 ```json
 {
   "specialist": "architecture-review-specialist",
+  "summary": {
+    "analysis": "Reviewed the changed domain service, repository dependency, and composition-layer wiring, focusing on dependency direction and established module boundaries.",
+    "result": "The review identified one evidence-backed architectural regression: the domain layer now depends directly on a concrete infrastructure repository implementation.",
+    "implementation": "The affected dependency is introduced in `src/domain/order_service.py`, while the repository abstraction and concrete binding are implemented in the domain and composition layers."
+  },
   "findings": [
     {
       "id": "ARCH-001",
@@ -538,14 +612,29 @@ Expected structure:
 }
 ```
 
-If no concrete architectural regression exists:
+If no concrete architectural regression exists, still return the three-paragraph
+summary:
 
 ```json
 {
   "specialist": "architecture-review-specialist",
+  "summary": {
+    "analysis": "Reviewed the changed module relationships, dependency direction, ownership boundaries, and directly related initialization structure.",
+    "result": "No evidence-backed architectural regression was identified within the reviewed scope.",
+    "implementation": "The reviewed structure is implemented in the changed modules, dependency declarations, and composition points identified in the Pull Request."
+  },
   "findings": []
 }
 ```
+
+`summary.analysis`, `summary.result`, and `summary.implementation` are required
+even when `findings` is empty.
+
+All specialist findings must use:
+
+`verification_status: UNVERIFIED`
+
+The summary must describe only what this specialist actually reviewed.
 
 ---
 
@@ -589,7 +678,7 @@ categories.
 
 # Artifact Ownership
 
-Return findings to the orchestrator.
+Return the complete specialist result, including `summary` and `findings`, to the orchestrator.
 
 Do not write artifacts directly.
 
@@ -619,6 +708,8 @@ Do not:
 - recommend broad rewrites
 - report pre-existing architectural debt as introduced
 - duplicate another specialist finding unless architectural impact is distinct
+- invent summary content not supported by the reviewed evidence
+- claim modules, dependencies, or code locations in the summary that were not actually inspected
 - write artifacts directly
 - commit
 - push
@@ -638,7 +729,10 @@ The architecture review is complete when:
 - responsibility movement was reviewed
 - speculative hypotheses were confirmed or discarded where a targeted read was sufficient
 - every reported finding has concrete dependency or boundary evidence
-- canonical findings JSON was returned to the orchestrator
+- the three required summary paragraphs were produced from reviewed evidence
+- the complete specialist JSON (`summary` + `findings`) was returned to the orchestrator
 
 If no evidence-backed architectural regression exists, return an empty findings
-list.
+list together with the required three-paragraph specialist summary.
+
+````

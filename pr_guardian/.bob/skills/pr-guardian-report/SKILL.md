@@ -1,3 +1,4 @@
+````
 ---
 name: pr-guardian-report
 description: >
@@ -49,7 +50,9 @@ Final reporting must remain deterministic.
 The report stage is responsible for:
 
 - validating existing artifacts
+- preserving specialist summaries
 - applying existing verification results
+- preserving verification summary when available
 - removing inactive findings
 - deduplicating by root cause
 - classifying findings
@@ -192,6 +195,7 @@ Validate:
 
 - JSON structure
 - `specialist`
+- `summary`
 - `findings`
 - specialist identity
 - finding schema
@@ -201,6 +205,17 @@ Validate:
 
 A finding artifact must belong to the expected specialist.
 
+Each completed specialist artifact must also contain:
+
+- `summary.analysis`
+- `summary.result`
+- `summary.implementation`
+
+Each summary field must be a non-empty string.
+
+The reporting stage must not rewrite, reinterpret, expand, or regenerate
+specialist summaries.
+
 Do not silently accept:
 
 - unknown specialist names
@@ -208,6 +223,46 @@ Do not silently accept:
 - invalid severities
 - unknown verification statuses
 - duplicate finding IDs within the same specialist result
+
+---
+
+# Specialist Summary Schema
+
+Every successfully completed specialist artifact must contain:
+
+```json
+{
+  "specialist": "code-review-specialist",
+  "summary": {
+    "analysis": "What this specialist actually reviewed.",
+    "result": "What the specialist concluded and the practical impact observed.",
+    "implementation": "Where the reviewed behavior is implemented."
+  },
+  "findings": []
+}
+```
+
+The three summary fields are mandatory:
+
+- `analysis`
+- `result`
+- `implementation`
+
+The reporting stage must preserve these fields exactly as persisted, except for
+safe Markdown escaping or deterministic formatting.
+
+It must not:
+
+- ask an LLM to rewrite the summary
+- merge summaries into new inferred conclusions
+- add files, symbols, routes, models, or implementation points not present in
+  the stored specialist result
+- infer a positive result when the specialist failed
+- synthesize a missing summary from findings
+
+If a selected specialist completed successfully but its required summary is
+missing or malformed, record an artifact inconsistency and stop or fail
+according to deterministic runtime policy.
 
 ---
 
@@ -264,7 +319,17 @@ If:
 
 `reports/verification/<pr-id>/verification-results.json`
 
-exists, validate and apply each result by `finding_id`.
+exists, validate:
+
+- `summary.analysis`
+- `summary.result`
+- `summary.implementation`
+- each verification result
+
+Then apply each result by `finding_id`.
+
+The verification summary is report content only. It must not alter findings,
+severity, classification, or specialist summaries.
 
 Verification may update:
 
@@ -459,6 +524,8 @@ The final report should summarize, when available:
 - selected reviewers
 - skipped reviewers
 - risk triggers
+- one three-paragraph summary for each successfully completed selected specialist
+- verification summary when available
 - total findings
 - blocking findings
 - advisory findings
@@ -520,6 +587,16 @@ Recommended structure:
   "risk_level": "HIGH",
   "risk_triggers": [],
   "selected_reviewers": [],
+  "specialist_reviews": [
+    {
+      "specialist": "code-review-specialist",
+      "summary": {
+        "analysis": "Stored specialist analysis summary.",
+        "result": "Stored specialist result summary.",
+        "implementation": "Stored specialist implementation summary."
+      }
+    }
+  ],
   "summary": {
     "total_findings": 0,
     "blocking": 0,
@@ -532,7 +609,10 @@ Recommended structure:
   "blocking": [],
   "advisory": [],
   "refuted": [],
-  "verification": {},
+  "verification": {
+    "summary": null,
+    "results": []
+  },
   "execution": {
     "status": "COMPLETE"
   }
@@ -579,6 +659,22 @@ Review Status
 
 ## Risk Triggers
 
+## Specialist Reviews
+
+### <Specialist Display Name>
+
+**Analysis**
+
+<stored summary.analysis>
+
+**Result**
+
+<stored summary.result>
+
+**Implementation**
+
+<stored summary.implementation>
+
 ## Blocking Findings
 
 ## Advisory Findings
@@ -600,6 +696,60 @@ Do not silently omit important state.
 
 ---
 
+# Specialist Review Rendering
+
+For every successfully completed selected specialist, render exactly one
+subsection under:
+
+`## Specialist Reviews`
+
+Recommended deterministic mapping:
+
+- `code-review-specialist` → `Code Review`
+- `security-review-specialist` → `Security Review`
+- `database-review-specialist` → `Database Review`
+- `api-review-specialist` → `API Review`
+- `async-review-specialist` → `Async / Queue Review`
+- `architecture-review-specialist` → `Architecture Review`
+
+Each specialist subsection must contain exactly:
+
+```markdown
+### Code Review
+
+**Analysis**
+
+<summary.analysis>
+
+**Result**
+
+<summary.result>
+
+**Implementation**
+
+<summary.implementation>
+```
+
+Use the summary stored by that specialist.
+
+Do not:
+
+- generate a replacement summary
+- combine multiple specialists into one paragraph
+- reorder specialist conclusions by perceived importance
+- infer missing implementation locations
+- convert findings into new prose when the stored summary already exists
+- claim a specialist reviewed an area outside its stored summary
+
+If a selected specialist failed during execution, do not fabricate a summary.
+Instead, record the failure under `Execution Notes` and preserve partial review
+status.
+
+If a specialist completed with zero findings, still render its three-paragraph
+summary.
+
+---
+
 # Finding Rendering
 
 For every active finding include:
@@ -617,9 +767,14 @@ For every active finding include:
 
 When verification exists, include:
 
+- the persisted verification `summary.analysis`
+- the persisted verification `summary.result`
+- the persisted verification `summary.implementation`
 - verification method
 - verification evidence
 - verification notes when relevant
+
+The verification summary must be rendered without reinterpretation.
 
 Do not embellish the stored evidence.
 
@@ -736,6 +891,8 @@ Do not use LLM inference for:
 - deduplication rules that can be deterministically implemented
 - Markdown structure
 - summary counts
+- specialist summary rewriting
+- verification summary rewriting
 - artifact paths
 
 ---
@@ -771,6 +928,23 @@ artifact is missing:
 - stop or mark report generation failed according to deterministic runtime policy
 
 Do not assume the specialist returned zero findings.
+
+---
+
+## Missing Specialist Summary
+
+When a selected specialist is recorded as successfully completed but its
+artifact does not contain valid:
+
+- `summary.analysis`
+- `summary.result`
+- `summary.implementation`
+
+then:
+
+- record an artifact inconsistency
+- do not synthesize replacement prose
+- stop or mark report generation failed according to deterministic runtime policy
 
 ---
 
@@ -837,6 +1011,10 @@ Do not:
 - fabricate metrics
 - fabricate verification
 - fabricate specialist results
+- fabricate specialist summaries
+- rewrite specialist summaries with a new model pass
+- infer implementation locations not present in specialist summaries
+- fabricate verification summaries
 - fabricate execution state
 - modify production code
 - modify migrations
@@ -868,11 +1046,13 @@ The command is complete only when:
 
 - `<pr-id>` was validated
 - required source artifacts were validated
-- findings were loaded safely
-- verification results were applied when available
+- findings and specialist summaries were loaded safely
+- every successfully completed selected specialist has a valid three-paragraph summary
+- verification results and verification summary were applied when available
 - inactive findings were handled
 - root-cause deduplication completed
 - final classification completed
+- specialist review summaries were rendered into `review.md`
 - `review.json` exists
 - `review.md` exists
 - `run-manifest.json` exists
@@ -918,3 +1098,5 @@ reports/runs/42/run-manifest.json
 Then display the generated:
 
 `review.md`
+
+````

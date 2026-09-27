@@ -1,4 +1,9 @@
 {
   "specialist": "code-review-specialist",
+  "summary": {
+    "analysis": "Reviewed the changes in the YouTube agent, graph nodes, state definitions, and related tests. Specifically, the review focused on the introduction of a new research context formatting function, updates to the query functions, and modifications to the state and test cases to accommodate the new research context.",
+    "result": "No evidence-backed behavioral defect was identified within the reviewed scope. The changes introduced a new research context formatting function and updated the query functions to use this context. The state definitions and tests were also updated to reflect these changes. The review did not identify any concrete correctness, regression, or state inconsistency issues.",
+    "implementation": "The reviewed behavior is implemented in the following files: `src/agents/youtube_agent/agent.py`, `src/agents/youtube_agent/formatting.py`, `src/graph/nodes.py`, `src/graph/state.py`, `src/graph/youtube.py`, `src/reanalysis/graph/nodes.py`, `src/reanalysis/graph/state.py`, `tests/test_reanalysis.py`, and `tests/test_youtube_agent.py`."
+  },
   "findings": []
 }

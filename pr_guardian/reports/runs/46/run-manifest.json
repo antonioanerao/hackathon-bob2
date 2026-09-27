@@ -1,0 +1,40 @@
+{
+  "pr_id": 46,
+  "operation": "review",
+  "risk_level": "LOW",
+  "selected_reviewers": [
+    "code-review-specialist"
+  ],
+  "executed_reviewers": [
+    "code-review-specialist"
+  ],
+  "skipped_reviewers": [
+    "api-review-specialist",
+    "architecture-review-specialist",
+    "async-review-specialist",
+    "database-review-specialist",
+    "performance-review-specialist",
+    "security-review-specialist"
+  ],
+  "specialist_results": [
+    {
+      "specialist": "code-review-specialist",
+      "finding_count": 0,
+      "summary_present": true
+    }
+  ],
+  "specialist_failures": [],
+  "verification_used": false,
+  "finding_counts": {
+    "total": 0,
+    "blocking": 0,
+    "advisory": 0,
+    "refuted": 0,
+    "not_applicable": 0
+  },
+  "artifacts": {
+    "review_json": "/home/dehux/projects/hackathon-bob2/pr_guardian/reports/reviews/46/review.json",
+    "review_markdown": "/home/dehux/projects/hackathon-bob2/pr_guardian/reports/reviews/46/review.md"
+  },
+  "status": "COMPLETE"
+}

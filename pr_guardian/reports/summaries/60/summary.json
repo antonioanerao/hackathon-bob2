@@ -1,3 +1,0 @@
-{
-  "summary": "The PR introduces a new 'limitations' field for analysis and reanalysis, separate from the main answer. This change is reflected in the README, prompts, and schema definitions. Tests are added to ensure the correct handling and delivery of limitations."
-}
