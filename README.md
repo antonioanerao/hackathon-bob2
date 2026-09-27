@@ -45,7 +45,7 @@ pr_guardian/           Python backend
 ├── .env-example       Environment template
 ├── requirements.txt
 └── app/
-    ├── config.py      Reads PR_GUARDIAN_SPECIALISTS from env
+    ├── config.py      Auto-discovers specialists from SKILL.md reviewer_id fields
     ├── orchestrator.py Full pipeline: collect → triage → specialists → report
     ├── triage.py      Calls Ollama to classify risk and select reviewers
     ├── pr_summary.py  Summarizes what the PR changes and why
@@ -72,7 +72,8 @@ pr_guardian/.bob/       Bob IDE layer
 ├── rules-agent/       Global read-only + evidence rules
 ├── rules-pr-guardian-orchestrator/
 ├── skills/            pr-triage, code-review, security-review, database-review,
-│                      api-review, architecture-review, queue-review, finding-verification
+│                      api-review, architecture-review, queue-review, finding-verification,
+│                      pr-guardian-review, pr-guardian-verify, pr-guardian-report
 └── custom_modes.yaml  Specialist modes
 ```
 
@@ -127,9 +128,9 @@ OLLAMA_URL="http://127.0.0.1:11434"
 
 GITHUB_TOKEN=""   # optional — increases GitHub API rate limit
 
-# Comma-separated list of reviewer-id:skill-name pairs
-# Controls which specialists are available to triage
-PR_GUARDIAN_SPECIALISTS="code-review-specialist:code-review,security-review-specialist:security-review"
+# Comma-separated list of reviewer-ids to exclude from triage
+# Leave empty to enable all specialists discovered from SKILL.md files
+PR_GUARDIAN_DISABLED_SPECIALISTS=""
 ```
 
 ---
@@ -174,24 +175,30 @@ Report: pr_guardian/reports/reviews/42/review.md
 | `OLLAMA_MODEL` | ✅ | — | Ollama model name |
 | `OLLAMA_URL` | — | `http://127.0.0.1:11434` | Ollama base URL |
 | `GITHUB_TOKEN` | — | — | GitHub PAT for API auth |
-| `PR_GUARDIAN_SPECIALISTS` | ✅ | — | `reviewer:skill` pairs (comma-separated) |
+| `PR_GUARDIAN_DISABLED_SPECIALISTS` | — | `""` (all enabled) | Comma-separated reviewer-ids to exclude from triage |
 
 ---
 
 ## Specialists
 
-Specialists are registered via `PR_GUARDIAN_SPECIALISTS`. Each entry maps a reviewer identifier to a skill name:
+Specialists are discovered automatically from any `SKILL.md` file under `.bob/skills/` that declares a `reviewer_id` field in its YAML frontmatter. No manual registration is required.
 
-```
-code-review-specialist:code-review
-security-review-specialist:security-review
-database-review-specialist:database-review
-api-review-specialist:api-review
-architecture-review-specialist:architecture-review
-async-review-specialist:queue-review
-```
+The active set of specialists available to triage:
 
-Triage selects a subset from this list based on the PR's risk triggers. Each selected specialist runs sequentially, receives the PR context and unified diff, and returns a structured findings JSON.
+| Reviewer ID | Skill |
+|---|---|
+| `code-review-specialist` | `code-review` |
+| `security-review-specialist` | `security-review` |
+| `database-review-specialist` | `database-review` |
+| `api-review-specialist` | `api-review` |
+| `architecture-review-specialist` | `architecture-review` |
+| `async-review-specialist` | `queue-review` |
+
+To add a new specialist, create a `SKILL.md` under `.bob/skills/<name>/` with a unique `reviewer_id` in its frontmatter — no code changes needed.
+
+To disable a specialist without removing it, add its `reviewer_id` to `PR_GUARDIAN_DISABLED_SPECIALISTS` in `.env`.
+
+Triage selects a subset from the active list based on the PR's risk triggers. Each selected specialist runs sequentially, receives the PR context and unified diff, and returns a structured findings JSON.
 
 ---
 
