@@ -1,12 +1,22 @@
 {
   "risk_level": "LOW",
-  "agent_budget": {
-    "max_reviewers": 2,
-    "max_verifiers": 1
-  },
   "risk_triggers": [],
   "selected_reviewers": [
     "code-review-specialist"
   ],
-  "skipped_reviewers": []
+  "skipped_reviewers": [
+    "api-review-specialist",
+    "architecture-review-specialist",
+    "async-review-specialist",
+    "database-review-specialist",
+    "performance-review-specialist",
+    "security-review-specialist"
+  ],
+  "reviewer_reasons": {
+    "code-review-specialist": "The PR includes changes to source code files that may affect application behavior."
+  },
+  "execution_planning": {
+    "expected_reviewers": 1,
+    "max_verifiers": 0
+  }
 }
