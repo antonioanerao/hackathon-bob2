@@ -8,10 +8,13 @@
 
 ## Summary
 
+The PR introduces a new 'limitations' field for analysis and reanalysis, separate from the main answer. This change is reflected in the README, prompts, and schema definitions. Tests are added to ensure the correct handling and delivery of limitations.
+
 - Changed files: 8
 - Additions: 133
 - Deletions: 17
 - Findings: 0
+- Python convention issues: 4
 - Blocking: 0
 - Advisory: 0
 
@@ -23,6 +26,13 @@
 
 No specific risk triggers detected.
 
+## Python Conventions
+
+- `src/reanalysis/graph/nodes.py:62` — E501: Line too long (81 > 79)
+- `src/reanalysis/graph/nodes.py:171` — E501: Line too long (81 > 79)
+- `tests/test_analysis_limitations.py:31` — E501: Line too long (82 > 79)
+- `tests/test_reanalysis.py:619` — E501: Line too long (81 > 79)
+
 ## Blocking Findings
 
 No verified blocking findings.
@@ -33,7 +43,7 @@ No advisory findings.
 
 ## Review Result
 
-No concrete findings were identified.
+No behavioral findings were identified.
 
 ---
 

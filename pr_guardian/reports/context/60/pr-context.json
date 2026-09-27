@@ -47,7 +47,7 @@
     },
     {
       "path": "tests/test_analysis_limitations.py",
-      "status": "added",
+      "status": "modified",
       "additions": 51,
       "deletions": 0
     },
@@ -67,5 +67,5 @@
     "queue": "",
     "ci": ""
   },
-  "collection_method": "github_api"
+  "collection_method": "gh"
 }

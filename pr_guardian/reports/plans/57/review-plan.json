@@ -1,12 +1,30 @@
 {
   "risk_level": "LOW",
-  "agent_budget": {
-    "max_reviewers": 1,
-    "max_verifiers": 0
-  },
-  "risk_triggers": [],
+  "risk_triggers": [
+    "BACKGROUND_JOB_CHANGED"
+  ],
   "selected_reviewers": [
+    "async-review-specialist",
     "code-review-specialist"
   ],
-  "skipped_reviewers": []
+  "skipped_reviewers": [
+    "api-review-specialist",
+    "architecture-review-specialist",
+    "database-review-specialist",
+    "performance-review-specialist",
+    "security-review-specialist"
+  ],
+  "reviewer_reasons": {
+    "async-review-specialist": "The PR modifies background job-related files.",
+    "code-review-specialist": "The PR modifies application behavior with code changes.",
+    "api-review-specialist": "No public API changes detected.",
+    "architecture-review-specialist": "No significant architectural changes detected.",
+    "database-review-specialist": "No database schema or query changes detected.",
+    "performance-review-specialist": "No performance-related changes detected.",
+    "security-review-specialist": "No security-related changes detected."
+  },
+  "execution_planning": {
+    "expected_reviewers": 1,
+    "max_verifiers": 0
+  }
 }

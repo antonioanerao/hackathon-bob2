@@ -5,8 +5,10 @@ import subprocess
 from pathlib import Path
 
 from .git_diff import get_pr_diff
+from .pr_summary import generate_pr_summary
 from .reports import write_report
 from .specialists import run_specialist
+from .style_review import review_python_style
 from .triage import run_triage
 
 
@@ -89,7 +91,7 @@ def run(
 ) -> None:
 
     print(
-        "[1/5] Collecting PR context..."
+        "[1/6] Collecting PR context..."
     )
 
     context = collect_context(
@@ -109,7 +111,7 @@ def run(
     )
 
     print(
-        "[2/5] Running triage..."
+        "[2/6] Running triage..."
     )
 
     plan = run_triage(
@@ -138,25 +140,25 @@ def run(
 
     all_findings = []
 
+    python_files = any(
+        item["path"].endswith(".py") and item["status"] != "removed"
+        for item in context["changed_files"]
+    )
+    owner, repo = parse_repository(context)
+    print("[3/6] Loading PR diff...")
+    diff = get_pr_diff(owner, repo, int(pr_id))
+
+    print("[4/6] Generating PR summary...")
+    summary = generate_pr_summary(context, diff, model)
+    write_json(
+        REPORTS / "summaries" / pr_id / "summary.json",
+        {"summary": summary},
+    )
+
+    print("[5/6] Reviewing PR changes...")
     if plan["selected_reviewers"]:
 
-        owner, repo = parse_repository(
-            context
-        )
-
-        print(
-            "[3/5] Loading PR diff..."
-        )
-
-        diff = get_pr_diff(
-            owner,
-            repo,
-            int(pr_id),
-        )
-
-        print(
-            "[4/5] Running specialists..."
-        )
+        print("  Running specialists...")
 
         for specialist in plan[
             "selected_reviewers"
@@ -189,16 +191,20 @@ def run(
             )
 
     else:
-        print(
-            "[3/5] No specialist required."
-        )
+        print("  Specialist review skipped.")
 
-        print(
-            "[4/5] Specialist review skipped."
-        )
+    style_review = {"checked_files": 0, "findings": []}
+    if python_files:
+        print("  Checking Python conventions...")
+        style_review = review_python_style(context, diff)
+
+    write_json(
+        REPORTS / "style" / pr_id / "pep8.json",
+        style_review,
+    )
 
     print(
-        "[5/5] Generating final report..."
+        "[6/6] Generating final report..."
     )
 
     write_report(
@@ -206,16 +212,21 @@ def run(
         pr_id=pr_id,
         context=context,
         review_plan=plan,
+        style_review=style_review,
+        summary=summary,
     )
 
-    print(
-        "[5/5] Review finished."
-    )
+    print("Review finished.")
 
     print(
         f"Findings: "
         f"{len(all_findings)}"
     )
+
+    if python_files:
+        print(f"Python conventions: {len(style_review['findings'])} issues")
+    else:
+        print("Python conventions: skipped (no changed Python files)")
 
     for finding in all_findings:
         print(

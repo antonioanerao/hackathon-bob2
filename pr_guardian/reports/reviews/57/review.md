@@ -8,20 +8,28 @@
 
 ## Summary
 
+Added duplicate check functionality for audio, video, and image files. Modified the analyze job to use a new query builder for duplicate checks and updated tests accordingly.
+
 - Changed files: 5
 - Additions: 104
 - Deletions: 11
-- Findings: 2
+- Findings: 0
+- Python convention issues: 0
 - Blocking: 0
-- Advisory: 2
+- Advisory: 0
 
 ## Reviewers
 
+- `async-review-specialist`
 - `code-review-specialist`
 
 ## Risk Triggers
 
-No specific risk triggers detected.
+- `BACKGROUND_JOB_CHANGED`
+
+## Python Conventions
+
+No convention issues found on changed Python lines.
 
 ## Blocking Findings
 
@@ -29,48 +37,11 @@ No verified blocking findings.
 
 ## Advisory Findings
 
-### PREFIX-001 — Potential code duplication
-
-- **Severity:** `MEDIUM`
-- **Category:** `Code Duplication`
-- **Verification:** `UNVERIFIED`
-- **File:** `src/jobs/analyze.py:66`
-
-**Evidence**
-
-The `duplicate_check` block is duplicated in the code.
-
-**Impact**
-
-The code can be simplified and made more maintainable.
-
-**Recommendation**
-
-Refactor the code to avoid duplication.
-
-### PREFIX-002 — Insufficient test coverage for new code
-
-- **Severity:** `MEDIUM`
-- **Category:** `Test Coverage`
-- **Verification:** `UNVERIFIED`
-- **File:** `tests/test_similarity_query.py:1`
-
-**Evidence**
-
-The new test file `test_similarity_query.py` does not have any test cases.
-
-**Impact**
-
-The new functionality may not be thoroughly tested.
-
-**Recommendation**
-
-Add test cases to ensure the new functionality works as expected.
-
+No advisory findings.
 
 ## Review Result
 
-The review contains advisory findings but no verified blocking findings.
+No behavioral findings were identified.
 
 ---
 

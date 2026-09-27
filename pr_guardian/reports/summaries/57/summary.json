@@ -1,0 +1,3 @@
+{
+  "summary": "Added duplicate check functionality for audio, video, and image files. Modified the analyze job to use a new query builder for duplicate checks and updated tests accordingly."
+}

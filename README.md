@@ -14,22 +14,26 @@ It minimises agent count, context, and tool calls while producing auditable, con
 ```text
 PR reference (URL or owner/repo#N)
         ↓
-scripts/collect-pr-context.sh   ← gh CLI or GitHub REST API
+pr_guardian/scripts/collect-pr-context.sh   ← gh CLI or GitHub REST API
         ↓
 pr_guardian/app/orchestrator.py
         ↓
 triage (Ollama)  →  review-plan.json
         ↓
+PR summary (Ollama, PR description + diff) → summary.json
+        ↓
 specialist loop (Ollama, one per selected reviewer)
         ↓
-reports/findings/<pr-id>/<specialist>.json
+pr_guardian/reports/findings/<pr-id>/<specialist>.json
         ↓
-reports/reviews/<pr-id>/review.json + review.md
+Python conventions (Ruff, changed lines only) → pep8.json
+        ↓
+pr_guardian/reports/reviews/<pr-id>/review.json + review.md
 ```
 
 The Python orchestrator drives the full pipeline end-to-end from a single `python main.py` invocation.
 
-The Bob layer (`.bob/`) mirrors the same architecture as Bob slash-commands and subagent specialists for interactive use inside the IBM Bob IDE.
+The Bob layer (`pr_guardian/.bob/`) mirrors the same architecture as Bob slash-commands and subagent specialists for interactive use inside the IBM Bob IDE.
 
 ---
 
@@ -44,22 +48,26 @@ pr_guardian/           Python backend
     ├── config.py      Reads PR_GUARDIAN_SPECIALISTS from env
     ├── orchestrator.py Full pipeline: collect → triage → specialists → report
     ├── triage.py      Calls Ollama to classify risk and select reviewers
+    ├── pr_summary.py  Summarizes what the PR changes and why
     ├── specialists.py Calls Ollama for each selected specialist
     ├── ollama_client.py HTTP client for Ollama /api/chat (JSON mode)
     ├── git_diff.py    Fetches the unified diff via GitHub API
+    ├── style_review.py Checks changed Python lines with Ruff
     ├── reports.py     Builds review.json and review.md
     └── prompts.py     Loads global-rules.md and skill SKILL.md files
 
-scripts/
+pr_guardian/scripts/
 └── collect-pr-context.sh   Collects PR metadata (gh CLI or REST API fallback)
 
-reports/               Generated artifacts (git-ignored)
+pr_guardian/reports/    Generated artifacts
 ├── context/<pr-id>/pr-context.json
 ├── plans/<pr-id>/review-plan.json
+├── summaries/<pr-id>/summary.json
 ├── findings/<pr-id>/<specialist>.json
+├── style/<pr-id>/pep8.json
 └── reviews/<pr-id>/review.json + review.md
 
-.bob/                  Bob IDE layer
+pr_guardian/.bob/       Bob IDE layer
 ├── commands/          /pr-guardian-review, /pr-guardian-verify, /pr-guardian-report
 ├── rules-agent/       Global read-only + evidence rules
 ├── rules-pr-guardian-orchestrator/
@@ -78,6 +86,7 @@ reports/               Generated artifacts (git-ignored)
 | [Ollama](https://ollama.ai) | Local LLM inference |
 | `requests` | HTTP calls to GitHub and Ollama |
 | `python-dotenv` | `.env` loading |
+| `ruff` | Python convention checks on changed PR lines |
 | `gh` CLI *(optional)* | Primary PR metadata collection |
 | `curl` + `bash` | REST API fallback in the collection script |
 
@@ -135,20 +144,24 @@ python main.py
 The pipeline prints progress and writes artifacts under `reports/`:
 
 ```
-[1/5] Collecting PR context...
-[2/5] Running triage...
+[1/6] Collecting PR context...
+[2/6] Running triage...
 Risk: HIGH
 Reviewers: ['code-review-specialist', 'security-review-specialist']
-[3/5] Loading PR diff...
-[4/5] Running specialists...
+[3/6] Loading PR diff...
+[4/6] Generating PR summary...
+[5/6] Reviewing PR changes...
+  Running specialists...
   → code-review-specialist
   → security-review-specialist
-[5/5] Generating final report...
-[5/5] Review finished.
+  Checking Python conventions...
+[6/6] Generating final report...
+Review finished.
 Findings: 3
+Python conventions: 2 issues
 CODE-001 HIGH ...
 SEC-001 MEDIUM ...
-Report: reports/reviews/42/review.md
+Report: pr_guardian/reports/reviews/42/review.md
 ```
 
 ---
@@ -184,15 +197,21 @@ Triage selects a subset from this list based on the PR's risk triggers. Each sel
 
 ## Artifacts
 
-All outputs are written under `reports/` and are git-ignored.
+Outputs are written under `pr_guardian/reports/`.
 
 | Artifact | Description |
 |---|---|
-| `reports/context/<pr-id>/pr-context.json` | Raw PR metadata from collection |
-| `reports/plans/<pr-id>/review-plan.json` | Triage output: risk level, selected reviewers, agent budget |
-| `reports/findings/<pr-id>/<specialist>.json` | Raw findings per specialist |
-| `reports/reviews/<pr-id>/review.json` | Synthesised review (blocking + advisory) |
-| `reports/reviews/<pr-id>/review.md` | Human-readable review report |
+| `pr_guardian/reports/context/<pr-id>/pr-context.json` | Raw PR metadata from collection |
+| `pr_guardian/reports/plans/<pr-id>/review-plan.json` | Triage output: risk level and selected reviewers |
+| `pr_guardian/reports/summaries/<pr-id>/summary.json` | Short description of what changed and why |
+| `pr_guardian/reports/findings/<pr-id>/<specialist>.json` | Raw findings per specialist |
+| `pr_guardian/reports/style/<pr-id>/pep8.json` | Ruff results for changed Python lines |
+| `pr_guardian/reports/reviews/<pr-id>/review.json` | Synthesised review (blocking + advisory) |
+| `pr_guardian/reports/reviews/<pr-id>/review.md` | Human-readable review report |
+
+Python convention checks run independently of triage when a PR changes Python files. Ruff checks the complete file at the PR head SHA with `E`, `W`, and `N` rules and a 79-character line limit; the report includes only diagnostics on added or modified lines. Convention issues appear in a separate report section and do not count as behavioral findings.
+
+The report's Summary section starts with 2–4 sentences generated from the PR title, description preview, and diff. The summary is saved separately and included in `review.json`. When the PR does not state a motivation, the model is instructed to say so rather than infer one.
 
 ### Finding schema
 
@@ -222,7 +241,7 @@ All outputs are written under `reports/` and are git-ignored.
 
 ## Bob IDE Layer
 
-The `.bob/` directory contains an equivalent interactive harness for the IBM Bob IDE.
+The `pr_guardian/.bob/` directory contains an equivalent interactive harness for the IBM Bob IDE.
 
 | Command | Mode | Purpose |
 |---|---|---|
@@ -236,7 +255,7 @@ Example:
 /pr-guardian-review https://github.com/owner/repository/pull/42
 ```
 
-See [`.bob/README.md`](.bob/README.md) for the full Bob architecture and design principles.
+See [`pr_guardian/.bob/README.md`](pr_guardian/.bob/README.md) for the full Bob architecture and design principles.
 
 ---
 

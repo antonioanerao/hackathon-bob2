@@ -2,34 +2,15 @@
   "pr_id": 57,
   "repository": "mp-ac/verifica-ai",
   "risk_level": "LOW",
+  "summary": "Added duplicate check functionality for audio, video, and image files. Modified the analyze job to use a new query builder for duplicate checks and updated tests accordingly.",
   "selected_reviewers": [
+    "async-review-specialist",
     "code-review-specialist"
   ],
   "blocking": [],
-  "advisory": [
-    {
-      "id": "PREFIX-001",
-      "severity": "MEDIUM",
-      "category": "Code Duplication",
-      "title": "Potential code duplication",
-      "file": "src/jobs/analyze.py",
-      "line": 66,
-      "evidence": "The `duplicate_check` block is duplicated in the code.",
-      "impact": "The code can be simplified and made more maintainable.",
-      "recommendation": "Refactor the code to avoid duplication.",
-      "verification_status": "UNVERIFIED"
-    },
-    {
-      "id": "PREFIX-002",
-      "severity": "MEDIUM",
-      "category": "Test Coverage",
-      "title": "Insufficient test coverage for new code",
-      "file": "tests/test_similarity_query.py",
-      "line": 1,
-      "evidence": "The new test file `test_similarity_query.py` does not have any test cases.",
-      "impact": "The new functionality may not be thoroughly tested.",
-      "recommendation": "Add test cases to ensure the new functionality works as expected.",
-      "verification_status": "UNVERIFIED"
-    }
-  ]
+  "advisory": [],
+  "python_conventions": {
+    "checked_files": 5,
+    "findings": []
+  }
 }
