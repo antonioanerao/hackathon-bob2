@@ -252,40 +252,31 @@ OLLAMA_URL=http://127.0.0.1:11500
 
 GITHUB_TOKEN=
 
-PR_GUARDIAN_SPECIALISTS=code-review-specialist:code-review,security-review-specialist:security-review,database-review-specialist:database-review,api-review-specialist:api-review,architecture-review-specialist:architecture-review,async-review-specialist:queue-review
+# Optional: disable discovered reviewers by ID.
+PR_GUARDIAN_DISABLED_SPECIALISTS=
 ```
 
 ---
 
 # Dynamic Specialists
 
-Specialists are configured through:
+Python discovers specialists from `.bob/skills/*/SKILL.md`. A skill is a
+specialist when its YAML frontmatter contains a `reviewer_id` field. Skills
+without that field remain available for their other roles but are not offered
+to triage as reviewers.
 
-```env
-PR_GUARDIAN_SPECIALISTS=
+For example, `.bob/skills/code-review/SKILL.md` begins with:
+
+```yaml
+---
+name: code-review
+reviewer_id: code-review-specialist
+description: >
+  Reviews changed application logic.
+---
 ```
 
-Format:
-
-```text
-reviewer-name:skill-name
-```
-
-Example:
-
-```text
-code-review-specialist:code-review
-```
-
-Multiple specialists are separated by commas.
-
-Example:
-
-```env
-PR_GUARDIAN_SPECIALISTS=code-review-specialist:code-review,security-review-specialist:security-review
-```
-
-The runtime converts this configuration into:
+The runtime builds a reviewer-to-skill mapping:
 
 ```python
 {
@@ -294,7 +285,13 @@ The runtime converts this configuration into:
 }
 ```
 
-This removes hardcoded specialist definitions from the Python code.
+To disable reviewers without removing skills, set their IDs in `.env`:
+
+```env
+PR_GUARDIAN_DISABLED_SPECIALISTS=security-review-specialist,database-review-specialist
+```
+
+Unknown IDs in this setting cause a configuration error.
 
 ---
 
@@ -306,18 +303,15 @@ Create a skill:
 .bob/skills/performance-review/SKILL.md
 ```
 
-Then add it to `.env`:
-
-```env
-PR_GUARDIAN_SPECIALISTS=...,performance-review-specialist:performance-review
-```
+Add `reviewer_id: performance-review-specialist` to its YAML frontmatter.
+The skill becomes available on the next run; no `.env` change is needed.
 
 No modification to `specialists.py` should be required.
 
 The execution flow becomes:
 
 ```text
-.env
+.bob/skills/*/SKILL.md
  ↓
 get_specialists()
  ↓
@@ -492,7 +486,7 @@ The triage returns structured JSON:
 }
 ```
 
-The runtime validates reviewer names against the specialists configured in `.env`.
+The runtime validates reviewer names against discovered, enabled specialists.
 
 Invalid reviewers are rejected.
 

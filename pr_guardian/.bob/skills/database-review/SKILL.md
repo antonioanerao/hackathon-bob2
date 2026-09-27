@@ -1,6 +1,7 @@
 ````
 ---
 name: database-review
+reviewer_id: database-review-specialist
 description: >
   Reviews database, persistence, schema, migration, ORM, query, transaction,
   indexing, and referential-integrity changes for concrete correctness,

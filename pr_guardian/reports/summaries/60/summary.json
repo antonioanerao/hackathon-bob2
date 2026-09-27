@@ -1,0 +1,3 @@
+{
+  "summary": "The PR introduces a new 'limitações' field for internal analyst notes, separate from the public response. It updates prompts and schemas to include this field, ensuring it's handled correctly in synthesis and analysis processes. Tests are added to verify the behavior of old results and the delivery of limitations."
+}

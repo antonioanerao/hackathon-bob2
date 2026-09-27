@@ -92,15 +92,14 @@ Do not preload:
 
 # 5. Reviewer Registry
 
-The set of available reviewers must come from runtime configuration.
+The set of available reviewers must come from runtime skill discovery.
 
-Example source:
-
-`PR_GUARDIAN_SPECIALISTS`
+Source: `.bob/skills/*/SKILL.md` files with `reviewer_id` metadata, excluding
+reviewers listed in `PR_GUARDIAN_DISABLED_SPECIALISTS`.
 
 The orchestrator must treat this registry as authoritative.
 
-Do not accept a reviewer returned by triage unless it exists in the configured reviewer registry.
+Do not accept a reviewer returned by triage unless it exists in the discovered reviewer registry.
 
 Reject:
 

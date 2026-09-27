@@ -1,6 +1,7 @@
 ````
 ---
 name: architecture-review
+reviewer_id: architecture-review-specialist
 description: >
   Reviews structural and dependency changes for concrete architectural
   regressions, boundary violations, circular dependencies, responsibility

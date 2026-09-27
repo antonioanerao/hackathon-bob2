@@ -1,6 +1,7 @@
 ````
 ---
 name: security-review
+reviewer_id: security-review-specialist
 description: >
   Reviews Pull Request changes for concrete, reachable, evidence-backed security
   vulnerabilities involving trust boundaries, authentication, authorization,

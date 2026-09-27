@@ -204,13 +204,12 @@ Provide triage with:
 
 # Reviewer Registry
 
-Available reviewers must come from runtime configuration.
+Available reviewers must come from runtime skill discovery.
 
-Typical source:
+Source: `.bob/skills/*/SKILL.md` files with `reviewer_id` metadata, excluding
+reviewers listed in `PR_GUARDIAN_DISABLED_SPECIALISTS`.
 
-`PR_GUARDIAN_SPECIALISTS`
-
-Example mapping:
+Example mapping from reviewer IDs to skill directories:
 
 ```text
 code-review-specialist:code-review

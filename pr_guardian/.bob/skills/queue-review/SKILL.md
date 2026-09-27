@@ -1,6 +1,7 @@
 ````
 ---
 name: queue-review
+reviewer_id: async-review-specialist
 description: >
   Reviews asynchronous processing, queue consumers, workers, retries,
   background jobs, and message-delivery behavior for concrete reliability,

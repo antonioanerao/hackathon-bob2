@@ -1,0 +1,93 @@
+{
+  "pr_id": 60,
+  "repository": "mp-ac/verifica-ai",
+  "title": "feat: o campo limitações agora é separado do corpo da mensagem e tem …",
+  "risk_level": "LOW",
+  "risk_triggers": [],
+  "selected_reviewers": [
+    "code-review-specialist"
+  ],
+  "skipped_reviewers": [
+    "api-review-specialist",
+    "architecture-review-specialist",
+    "async-review-specialist",
+    "database-review-specialist",
+    "security-review-specialist"
+  ],
+  "reviewer_reasons": {
+    "code-review-specialist": "The PR modifies multiple source files, including changes to control flow and business logic.",
+    "api-review-specialist": "No changes to public API routes or contracts.",
+    "architecture-review-specialist": "No significant changes to module boundaries or dependency direction.",
+    "async-review-specialist": "No changes to queue producers, consumers, or background tasks.",
+    "database-review-specialist": "No changes to database schema, migrations, queries, or transactions.",
+    "security-review-specialist": "No changes to authentication, authorization, tenant isolation, or security boundaries."
+  },
+  "pr_summary": "The PR introduces a new 'limitações' field for internal analyst notes, separate from the public response. It updates prompts and schemas to include this field, ensuring it's handled correctly in synthesis and analysis processes. Tests are added to verify the behavior of old results and the delivery of limitations.",
+  "specialist_reviews": [
+    {
+      "specialist": "code-review-specialist",
+      "summary": {
+        "analysis": "Reviewed the changes related to separating the 'limitações' field from the body of the message in the application logic, including updates to prompts, schema definitions, and test cases.",
+        "result": "No evidence-backed behavioral defect was identified within the reviewed scope. The changes appear to correctly handle the separation of 'limitações' and ensure that the field is properly managed in the application logic.",
+        "implementation": "The reviewed behavior is implemented in the changed files such as `src/graph/state.py`, `src/reanalysis/graph/nodes.py`, and `src/reanalysis/schemas.py`, with corresponding behavior exercised by the new and modified test cases in `tests/test_analysis_limitations.py` and `tests/test_reanalysis.py`."
+      }
+    }
+  ],
+  "summary": {
+    "total_findings": 0,
+    "active_findings": 0,
+    "blocking": 0,
+    "advisory": 0,
+    "verified": 0,
+    "unverified": 0,
+    "refuted": 0,
+    "not_applicable": 0,
+    "verification_failed": 0
+  },
+  "blocking": [],
+  "advisory": [],
+  "refuted": [],
+  "not_applicable": [],
+  "verification": {
+    "summary": null,
+    "results": []
+  },
+  "supporting_evidence": {
+    "python_conventions": {
+      "checked_files": 5,
+      "findings": [
+        {
+          "file": "src/reanalysis/graph/nodes.py",
+          "line": 62,
+          "code": "E501",
+          "message": "Line too long (81 > 79)"
+        },
+        {
+          "file": "src/reanalysis/graph/nodes.py",
+          "line": 171,
+          "code": "E501",
+          "message": "Line too long (81 > 79)"
+        },
+        {
+          "file": "tests/test_analysis_limitations.py",
+          "line": 31,
+          "code": "E501",
+          "message": "Line too long (82 > 79)"
+        },
+        {
+          "file": "tests/test_reanalysis.py",
+          "line": 619,
+          "code": "E501",
+          "message": "Line too long (81 > 79)"
+        }
+      ]
+    }
+  },
+  "execution": {
+    "status": "COMPLETE",
+    "executed_reviewers": [
+      "code-review-specialist"
+    ],
+    "specialist_failures": []
+  }
+}

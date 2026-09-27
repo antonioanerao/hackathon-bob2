@@ -1,6 +1,7 @@
 ````
 ---
 name: api-review
+reviewer_id: api-review-specialist
 description: >
   Reviews API changes for concrete contract regressions, HTTP semantic errors,
   validation gaps, authorization problems, specification mismatches, and

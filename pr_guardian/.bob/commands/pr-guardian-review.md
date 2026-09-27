@@ -131,9 +131,8 @@ Provide triage with:
 - available specialist reviewers
 - relevant repository hints
 
-The available reviewer list must come from runtime configuration, such as:
-
-`PR_GUARDIAN_SPECIALISTS`
+The available reviewer list must come from runtime discovery of
+`.bob/skills/*/SKILL.md` files with `reviewer_id` metadata.
 
 Triage responsibilities are limited to:
 

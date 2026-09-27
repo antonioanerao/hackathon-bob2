@@ -1,0 +1,26 @@
+{
+  "risk_level": "LOW",
+  "risk_triggers": [],
+  "selected_reviewers": [
+    "code-review-specialist"
+  ],
+  "skipped_reviewers": [
+    "api-review-specialist",
+    "architecture-review-specialist",
+    "async-review-specialist",
+    "database-review-specialist",
+    "security-review-specialist"
+  ],
+  "reviewer_reasons": {
+    "code-review-specialist": "The PR modifies multiple source files, including changes to control flow and business logic.",
+    "api-review-specialist": "No changes to public API routes or contracts.",
+    "architecture-review-specialist": "No significant changes to module boundaries or dependency direction.",
+    "async-review-specialist": "No changes to queue producers, consumers, or background tasks.",
+    "database-review-specialist": "No changes to database schema, migrations, queries, or transactions.",
+    "security-review-specialist": "No changes to authentication, authorization, tenant isolation, or security boundaries."
+  },
+  "execution_planning": {
+    "expected_reviewers": 1,
+    "max_verifiers": 0
+  }
+}

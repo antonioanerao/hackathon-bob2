@@ -1,5 +1,6 @@
 ---
 name: code-review
+reviewer_id: code-review-specialist
 description: >
   Reviews changed application logic for concrete, evidence-backed correctness,
   state, control-flow, concurrency, error-handling, and regression defects.
